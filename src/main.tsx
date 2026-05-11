@@ -113,6 +113,19 @@ type AcademicPlanTerm = {
   courses: string[];
 };
 
+type NavigateTask = {
+  title: string;
+  type: "Event" | "To-Do" | "Notification" | "Status";
+  date: string;
+  priority: "High" | "Medium" | "Low";
+};
+
+type NavigateResource = {
+  name: string;
+  category: string;
+  detail: string;
+};
+
 type MatchedListing = Listing & {
   matchCount: number;
   matchedTerms: string[];
@@ -372,6 +385,97 @@ const navigateAcademicPlan: AcademicPlanTerm[] = [
       "ENVS 283 - Environmental Sustainability",
       "FINC 355 - International Finance Management"
     ]
+  }
+];
+
+const navigateTasks: NavigateTask[] = [
+  {
+    title: "First week of Summer 2026 classes",
+    type: "Event",
+    date: "Due May 18, 2026 at 7:00 AM",
+    priority: "High"
+  },
+  {
+    title: "Schedule an Appointment with your Academic Advisor",
+    type: "To-Do",
+    date: "June 1, 2026 to August 31, 2026",
+    priority: "High"
+  },
+  {
+    title: "Schedule an Appointment with a Career Services Counselor",
+    type: "To-Do",
+    date: "June 29, 2026 to August 31, 2026",
+    priority: "High"
+  },
+  {
+    title: "Take part in a Career or Internship Fair",
+    type: "To-Do",
+    date: "May 25, 2026 to August 31, 2026",
+    priority: "High"
+  },
+  {
+    title: "Schedule an Appointment with a Financial Aid Counselor",
+    type: "To-Do",
+    date: "June 1, 2026 to August 31, 2026",
+    priority: "Medium"
+  },
+  {
+    title: "Check out services offered in the Tutoring Center",
+    type: "To-Do",
+    date: "May 25, 2026 to August 31, 2026",
+    priority: "Medium"
+  },
+  {
+    title: "Review LUCommunity and sign up for a club or organization",
+    type: "To-Do",
+    date: "May 25, 2026 to August 31, 2026",
+    priority: "Low"
+  },
+  {
+    title: "Attend a Student Senate Meeting with SGLC",
+    type: "To-Do",
+    date: "June 8, 2026 to August 31, 2026",
+    priority: "Low"
+  },
+  {
+    title: "Please give feedback on your recent appointment",
+    type: "Notification",
+    date: "Last sent Feb 25",
+    priority: "Medium"
+  },
+  {
+    title: "No active holds",
+    type: "Status",
+    date: "Navigate360 Holds",
+    priority: "Low"
+  }
+];
+
+const navigateResources: NavigateResource[] = [
+  {
+    name: "Vargas-Castro, Vicky",
+    category: "Advisor",
+    detail: "Listed in Navigate360 People under Advisor."
+  },
+  {
+    name: "Center for Experiential Learning",
+    category: "Academic Support",
+    detail: "Lake Shore Campus resource for experiential learning opportunities."
+  },
+  {
+    name: "Tutoring Center",
+    category: "Academic Support",
+    detail: "Peer tutoring, supplemental instruction, and student success support."
+  },
+  {
+    name: "Writing Center",
+    category: "Academic Support",
+    detail: "Coaching and feedback for writing assignments."
+  },
+  {
+    name: "Resource Librarians (WTC)",
+    category: "Academic Support",
+    detail: "Water Tower Campus research assistance."
   }
 ];
 
@@ -784,6 +888,7 @@ function App() {
           <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
           <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
           <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
+          <Metric label="Navigate tasks" value={String(navigateTasks.length)} detail="Checklist + alerts" />
           <Metric
             label="Courses tracked"
             value={String(courseList.length)}
@@ -1204,6 +1309,43 @@ function App() {
                       <li key={`${term.term}-${course}`}>{course}</li>
                     ))}
                   </ul>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="navigate-action-center">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Checklist and alerts</p>
+                <h4>Navigate360 action center</h4>
+              </div>
+              <span className="progress-pill">
+                {navigateTasks.filter((task) => task.priority === "High").length} high priority
+              </span>
+            </div>
+            <div className="task-grid">
+              {navigateTasks.map((task) => (
+                <article className={`task-card ${task.priority.toLowerCase()}`} key={`${task.title}-${task.date}`}>
+                  <span>{task.type}</span>
+                  <strong>{task.title}</strong>
+                  <p>{task.date}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="navigate-resources">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Resources</p>
+                <h4>Useful Navigate360 contacts and places</h4>
+              </div>
+            </div>
+            <div className="resource-grid">
+              {navigateResources.map((resource) => (
+                <article key={`${resource.category}-${resource.name}`}>
+                  <span>{resource.category}</span>
+                  <strong>{resource.name}</strong>
+                  <p>{resource.detail}</p>
                 </article>
               ))}
             </div>

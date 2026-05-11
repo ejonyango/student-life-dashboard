@@ -753,7 +753,9 @@ button {
 }
 
 .navigate-schedule,
-.academic-plan {
+.academic-plan,
+.navigate-action-center,
+.navigate-resources {
   display: grid;
   gap: 12px;
   margin-top: 16px;
@@ -764,7 +766,9 @@ button {
 }
 
 .navigate-schedule h4,
-.academic-plan h4 {
+.academic-plan h4,
+.navigate-action-center h4,
+.navigate-resources h4 {
   margin: 0;
 }
 
@@ -822,6 +826,52 @@ button {
   margin: 0;
   padding-left: 18px;
   color: #4e5c68;
+}
+
+.task-grid,
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.task-card,
+.resource-grid article {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.task-card.high {
+  border-left: 4px solid #e4002b;
+}
+
+.task-card.medium {
+  border-left: 4px solid #41b6e6;
+}
+
+.task-card.low {
+  border-left: 4px solid #0b75a5;
+}
+
+.task-card span,
+.resource-grid span {
+  color: #0b75a5;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.task-card p,
+.resource-grid p {
+  margin: 0;
+  color: #5e7180;
+  font-size: 0.9rem;
 }
 
 .navigate-import h4,
@@ -1084,7 +1134,9 @@ button {
   .listing-grid,
   .resume-grid,
   .integration-grid,
-  .plan-grid {
+  .plan-grid,
+  .task-grid,
+  .resource-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1156,7 +1208,9 @@ button {
   .course-form,
   .resume-grid,
   .integration-grid,
-  .plan-grid {
+  .plan-grid,
+  .task-grid,
+  .resource-grid {
     grid-template-columns: 1fr;
   }
 
