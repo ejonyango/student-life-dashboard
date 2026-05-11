@@ -1287,21 +1287,36 @@ function getDeepSeekRoute(task = "application_packet") {
 }
 
 function buildAgentActionPrompt(body, route) {
+  const action = body.action || {};
+  const isRenewableBrief = action.actionType === "renewable_energy_newsletter";
+
   return [
-    "TASK: Improve or draft one approval-required agent action for Eric Onyango.",
+    isRenewableBrief
+      ? "TASK: Draft an approval-required renewable energy investing intelligence brief for Eric Onyango."
+      : "TASK: Improve or draft one approval-required agent action for Eric Onyango.",
     "STUDENT: Eric Onyango, Loyola University Chicago, BBA Finance.",
     "MODEL ROUTE:",
     JSON.stringify(route),
     "",
     "OUTPUT CONTRACT:",
     "Return one valid JSON object only. Do not wrap it in markdown.",
-    'Required keys: { "subject": string, "body": string, "approvalChecklist": string[], "riskNotes": string[] }',
+    isRenewableBrief
+      ? 'Required keys: { "subject": string, "body": string, "trendThemes": string[], "importantDevelopments": string[], "industryImpacts": string[], "investmentAngles": string[], "sourceNotes": string[], "approvalChecklist": string[], "riskNotes": string[] }'
+      : 'Required keys: { "subject": string, "body": string, "approvalChecklist": string[], "riskNotes": string[] }',
     "",
     "QUALITY RULES:",
     "- Keep the result truthful and specific to Eric's finance internship goals.",
     "- Do not claim anything was sent, submitted, posted, scheduled, or approved.",
     "- Keep body concise and ready for student review.",
     "- Include concrete approval checks before the action can be used.",
+    ...(isRenewableBrief ? [
+      "- Identify 3-5 cross-article trend themes, not just isolated headlines.",
+      "- Highlight important developments from the supplied news items and name the source for each.",
+      "- Explain likely industry impact: developers, utilities, grid operators, manufacturers, investors, policy, financing, or commodity exposure.",
+      "- Explain investment relevance: cost of capital, project finance, tax credits, demand growth, margin pressure, M&A, risk, or valuation implications.",
+      "- Include student takeaways useful for interviews, coursework, and internship networking.",
+      "- If the news evidence is thin or repetitive, say what needs more verification."
+    ] : []),
     "",
     "AGENT ACTION JSON:",
     JSON.stringify(body.action || {}),

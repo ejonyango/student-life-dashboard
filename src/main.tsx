@@ -1287,8 +1287,18 @@ function App() {
       const payload = await response.json();
       const checklist = Array.isArray(payload.draft?.approvalChecklist) ? payload.draft.approvalChecklist : [];
       const risks = Array.isArray(payload.draft?.riskNotes) ? payload.draft.riskNotes : [];
+      const trendThemes = Array.isArray(payload.draft?.trendThemes) ? payload.draft.trendThemes : [];
+      const importantDevelopments = Array.isArray(payload.draft?.importantDevelopments) ? payload.draft.importantDevelopments : [];
+      const industryImpacts = Array.isArray(payload.draft?.industryImpacts) ? payload.draft.industryImpacts : [];
+      const investmentAngles = Array.isArray(payload.draft?.investmentAngles) ? payload.draft.investmentAngles : [];
+      const sourceNotes = Array.isArray(payload.draft?.sourceNotes) ? payload.draft.sourceNotes : [];
       const generatedBody = [
         payload.draft?.body || action.body,
+        trendThemes.length ? `\nTrend themes:\n- ${trendThemes.join("\n- ")}` : "",
+        importantDevelopments.length ? `\nImportant developments:\n- ${importantDevelopments.join("\n- ")}` : "",
+        industryImpacts.length ? `\nIndustry impact:\n- ${industryImpacts.join("\n- ")}` : "",
+        investmentAngles.length ? `\nInvestment angles:\n- ${investmentAngles.join("\n- ")}` : "",
+        sourceNotes.length ? `\nSource notes:\n- ${sourceNotes.join("\n- ")}` : "",
         checklist.length ? `\nApproval checklist:\n- ${checklist.join("\n- ")}` : "",
         risks.length ? `\nRisk notes:\n- ${risks.join("\n- ")}` : ""
       ].filter(Boolean).join("\n");
