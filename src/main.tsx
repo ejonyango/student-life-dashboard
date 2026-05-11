@@ -2068,366 +2068,236 @@ function App() {
           </div>
         </header>
 
-        <section className={`hero-panel dashboard-hero ${currentPage === "dashboard" ? "" : "hidden-page"}`} id="dashboard">
-          <div>
-              <p className="eyebrow">Eric Onyango profile</p>
-            <h2>
-              {resumeProfile.major
-                ? `${capitalizeWords(resumeProfile.major)} resume is driving every internship recommendation.`
-                : "Upload the student resume to drive every internship recommendation."}
-            </h2>
-            <p>
-              Eric’s BBA Finance profile, accounting and information systems minors, capital
-              markets experience, and investment research signals drive every listing and task.
-            </p>
-          </div>
-          <div className="briefing-stack">
+        <section className={`dashboard-redesign ${currentPage === "dashboard" ? "" : "hidden-page"}`} id="dashboard">
+          <article className="dashboard-focus-card">
             <div>
-              <Sparkles size={18} />
-              <span>Top resume match</span>
-              <strong>{strongestMatch ? `${strongestMatch.company}: ${strongestMatch.role}` : "No role matched yet"}</strong>
+              <p className="eyebrow">Today’s command center</p>
+              <h2>
+                {upcomingAssignments[0]
+                  ? `Next academic move: ${upcomingAssignments[0].title}`
+                  : strongestMatch
+                    ? `Next career move: prepare ${strongestMatch.company}`
+                    : "Keep Eric’s calendar, coursework, and recruiting pipeline current."}
+              </h2>
+              <p>
+                {upcomingAssignments[0]
+                  ? `${upcomingAssignments[0].courseName} is due ${formatAssignmentDue(upcomingAssignments[0])}. ${formatAssignmentReading(upcomingAssignments[0], courseList) || "Use the Advisor to turn it into a timed work plan."}`
+                  : strongestMatch
+                    ? `${strongestMatch.role} is the strongest current resume match at ${strongestMatch.fit}%.`
+                    : "Add assignments, calendar entries, and live job results so the dashboard can prioritize the day."}
+              </p>
+            </div>
+            <div className="focus-actions">
+              <a className="primary-button" href="#calendar">
+                <CalendarDays size={16} /> Calendar
+              </a>
+              <a className="ghost-button" href="#advisor" onClick={() => setAdvisorTask("assignment_checkin")}>
+                <Sparkles size={16} /> Assignment plan
+              </a>
+            </div>
+          </article>
+
+          <div className="dashboard-pulse" aria-label="Dashboard pulse">
+            <div>
+              <span>Due soon</span>
+              <strong>{upcomingAssignments.length}</strong>
+              <em>assignments</em>
             </div>
             <div>
-              <Clock3 size={18} />
-              <span>Finance focus</span>
-              <strong>At least 2 resume correlations per listing</strong>
+              <span>Events</span>
+              <strong>{upcomingCalendarEntries.length}</strong>
+              <em>calendar entries</em>
+            </div>
+            <div>
+              <span>Pipeline</span>
+              <strong>{applicationList.length}</strong>
+              <em>applications</em>
+            </div>
+            <div>
+              <span>Academic</span>
+              <strong>{academicStanding.gpa}</strong>
+              <em>{coursesLeftAfterCurrentTerm} courses left</em>
+            </div>
+            <div className={assignmentFreshness.isStale ? "needs-attention" : ""}>
+              <span>Data check</span>
+              <strong>{assignmentFreshness.isStale ? "Check" : "Current"}</strong>
+              <em>{assignmentFreshness.label}</em>
             </div>
           </div>
-        </section>
 
-        <section className={`dashboard-command ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Eric dashboard command center">
-          <article className="command-primary">
-            <p className="eyebrow">Today’s focus</p>
-            <h3>
-              {upcomingAssignments[0]
-                ? `Finish the next calendar item: ${upcomingAssignments[0].title}.`
-                : "Keep finance recruiting, Fall registration, and Navigate360 tasks moving together."}
-            </h3>
-            <p>
-              {upcomingAssignments[0]
-                ? `${upcomingAssignments[0].courseName} is due ${formatAssignmentDue(upcomingAssignments[0])}. ${formatAssignmentReading(upcomingAssignments[0], courseList) || "Use the Advisor to turn the assignment into a timed action plan."}`
-                : "Best next move: schedule Career Services and Academic Advisor appointments, then use the approved baseline resume to prepare applications for the strongest finance matches."}
-            </p>
-            <div className="command-strip">
-              <span>{baselineResume.status} baseline</span>
-              <span>{matchedListings.length} matched listings</span>
-              <span>{highPriorityTasks.length} high-priority tasks</span>
-              <span>{upcomingAssignments.length} calendar due</span>
-              <span>{upcomingCalendarEntries.length} calendar events</span>
-              <span>{academicStanding.gpaLabel} {academicStanding.gpa}</span>
-            </div>
-          </article>
-
-          <article className="command-card">
-            <span>Top application target</span>
-            <strong>{strongestMatch ? strongestMatch.role : "No match yet"}</strong>
-            <p>{strongestMatch ? `${strongestMatch.company} · ${strongestMatch.fit}% resume match` : "Upload or approve a baseline resume."}</p>
-          </article>
-
-          <article className="command-card">
-            <span>Next class signal</span>
-            <strong>{nextClass ? nextClass.course : "No course saved"}</strong>
-            <p>{nextClass ? `${nextClass.time} · ${nextClass.location || "Location TBD"}` : "Add Eric’s registered courses in School."}</p>
-          </article>
-
-          <article className="command-card alert">
-            <span>Navigate360 action</span>
-            <strong>{highPriorityTasks[0]?.title ?? "No urgent task"}</strong>
-            <p>{highPriorityTasks[0]?.date ?? "All clear"}</p>
-          </article>
-
-          <article className="command-card academic">
-            <span>Academic standing</span>
-            <strong>{academicStanding.gpaLabel} {academicStanding.gpa}</strong>
-            <p>{completedCourseCount} completed courses · {academicStanding.classYear}</p>
-          </article>
-
-          <article className="command-card due">
-            <span>Next due</span>
-            <strong>{upcomingAssignments[0] ? upcomingAssignments[0].title : "No due dates saved"}</strong>
-            <p>
-              {upcomingAssignments[0]
-                ? `${upcomingAssignments[0].courseName} · ${formatAssignmentDue(upcomingAssignments[0])}`
-                : "Add assignments in Advisor or Calendar."}
-            </p>
-          </article>
-
-          <article className={`command-card reminder ${assignmentFreshness.isStale ? "alert" : ""}`}>
-            <span>Assignment reminder</span>
-            <strong>{assignmentFreshness.label}</strong>
-            <p>{assignmentFreshness.detail}</p>
-            <button className="ghost-button" type="button" onClick={markAssignmentReminderChecked}>
-              Checked today
-            </button>
-          </article>
-        </section>
-
-        <section className={`metric-grid compact-metrics ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Student life metrics">
-          <Metric label={academicStanding.gpaLabel} value={academicStanding.gpa} detail={academicStanding.honors.join(" · ")} />
-          <Metric label="Courses completed" value={String(completedCourseCount)} detail="From resume/course history" />
-          <Metric label="Resume skills" value={String(resumeProfile.skills.length)} detail="Saved from upload" />
-          <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
-          <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
-          <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
-          <Metric label="Navigate tasks" value={String(navigateTasks.length)} detail="Checklist + alerts" />
-          <Metric label="Upcoming due" value={String(upcomingAssignments.length)} detail="Saved assignment deadlines" />
-          <Metric label="Calendar events" value={String(upcomingCalendarEntries.length)} detail="Study blocks + interviews" />
-          <Metric label="Reminder status" value={assignmentFreshness.isStale ? "Check" : "Current"} detail={assignmentFreshness.label} />
-          <Metric
-            label="Courses tracked"
-            value={String(courseList.length)}
-            detail={`${highPriorityCourses} high priority`}
-          />
-          <Metric
-            label="Courses left"
-            value={String(coursesLeftAfterCurrentTerm)}
-            detail={`${totalKnownProgramCourses} known program courses`}
-          />
-        </section>
-
-        <section className={`dashboard-overview-grid ${currentPage === "dashboard" ? "" : "hidden-page"}`}>
-          <article className="overview-panel calendar-summary">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Calendar</p>
-                <h3>Upcoming due dates</h3>
+          <section className="dashboard-main-grid">
+            <article className="overview-panel workload-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Calendar</p>
+                  <h3>Workload and schedule</h3>
+                </div>
+                <a className="text-link" href="#calendar">Open calendar</a>
               </div>
-              <a className="text-link" href="#calendar">Open calendar</a>
-            </div>
-            <div className="dashboard-due-list">
-              {upcomingAssignments.slice(0, 5).map((assignment) => (
-                <article className="dashboard-due-row" key={`dashboard-due-${assignment.id || assignment.courseName}-${assignment.title}`}>
-                  <div className="due-date-block">
-                    <strong>{formatAssignmentDueDay(assignment)}</strong>
-                    <span>{formatAssignmentDueTime(assignment)}</span>
+              <div className="workload-columns">
+                <div>
+                  <div className="section-kicker">
+                    <strong>Due dates</strong>
+                    <span>{upcomingAssignments.length} upcoming</span>
                   </div>
-                  <div>
-                    <strong>{assignment.title}</strong>
-                    <span>{assignment.courseName}</span>
-                    {formatAssignmentReading(assignment, courseList) ? <em>{formatAssignmentReading(assignment, courseList)}</em> : null}
+                  <div className="dashboard-due-list">
+                    {upcomingAssignments.slice(0, 4).map((assignment) => (
+                      <article className="dashboard-due-row" key={`dashboard-due-${assignment.id || assignment.courseName}-${assignment.title}`}>
+                        <div className="due-date-block">
+                          <strong>{formatAssignmentDueDay(assignment)}</strong>
+                          <span>{formatAssignmentDueTime(assignment)}</span>
+                        </div>
+                        <div>
+                          <strong>{assignment.title}</strong>
+                          <span>{assignment.courseName}</span>
+                          {formatAssignmentReading(assignment, courseList) ? <em>{formatAssignmentReading(assignment, courseList)}</em> : null}
+                        </div>
+                        <span className={`due-chip ${assignment.priority}`}>{assignment.priority}</span>
+                      </article>
+                    ))}
                   </div>
-                  <span className={`due-chip ${assignment.priority}`}>{assignment.priority}</span>
-                </article>
-              ))}
-            </div>
-            {upcomingAssignments.length === 0 ? (
-              <div className="empty-state">
-                <strong>No calendar due dates yet.</strong>
-                <span>Add due items in Calendar or Assignment check-in and they will appear here.</span>
-              </div>
-            ) : null}
-          </article>
-
-          <article className="overview-panel calendar-event-summary">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Calendar entries</p>
-                <h3>Upcoming events</h3>
-              </div>
-              <a className="text-link" href="#calendar">Add event</a>
-            </div>
-            <div className="mini-list">
-              {upcomingCalendarEntries.slice(0, 4).map((entry) => (
-                <div key={`dashboard-event-${entry.id || entry.title}`}>
-                  <strong>{entry.title}</strong>
-                  <span>{entry.courseName || entry.eventType.replace("_", " ")} · {formatCalendarEntryTime(entry)}</span>
-                  {entry.googleEventUrl ? (
-                    <a className="text-link" href={entry.googleEventUrl} target="_blank" rel="noreferrer">
-                      Add to Google Calendar
-                    </a>
+                  {upcomingAssignments.length === 0 ? (
+                    <div className="empty-state">
+                      <strong>No due dates yet.</strong>
+                      <span>Add assignments in Calendar or Advisor.</span>
+                    </div>
                   ) : null}
                 </div>
-              ))}
-            </div>
-            {upcomingCalendarEntries.length === 0 ? (
-              <div className="empty-state">
-                <strong>No upcoming calendar events.</strong>
-                <span>Add study blocks, reminders, interviews, or class events from the Calendar page.</span>
-              </div>
-            ) : null}
-          </article>
-
-          <article className="overview-panel reminder-panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Reminder</p>
-                <h3>Assignment data check-in</h3>
-              </div>
-              <span className={`provider-pill ${reminderSettings.enabled ? "ok" : "missing_key"}`}>
-                {reminderSettings.enabled ? "Enabled" : "Paused"}
-              </span>
-            </div>
-            <div className="reminder-status">
-              <Clock3 size={18} />
-              <div>
-                <strong>{assignmentFreshness.label}</strong>
-                <span>{assignmentFreshness.detail}</span>
-              </div>
-            </div>
-            <div className="reminder-form">
-              <label>
-                Cadence
-                <select
-                  value={reminderSettings.cadence}
-                  onChange={(event) =>
-                    setReminderSettings({
-                      ...reminderSettings,
-                      cadence: event.target.value as ReminderSettings["cadence"]
-                    })
-                  }
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekdays">Weekdays</option>
-                  <option value="weekly">Weekly</option>
-                </select>
-              </label>
-              <label>
-                Time
-                <input
-                  type="time"
-                  value={reminderSettings.checkInTime}
-                  onChange={(event) => setReminderSettings({ ...reminderSettings, checkInTime: event.target.value })}
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  value={reminderSettings.email}
-                  onChange={(event) => setReminderSettings({ ...reminderSettings, email: event.target.value })}
-                  placeholder="student@email.edu"
-                />
-              </label>
-              <label>
-                Phone
-                <input
-                  value={reminderSettings.phone}
-                  onChange={(event) => setReminderSettings({ ...reminderSettings, phone: event.target.value })}
-                  placeholder="+1 312 555 0100"
-                />
-              </label>
-            </div>
-            <div className="reminder-channel-grid">
-              {(["email", "sms", "push"] as Array<keyof ReminderSettings["channels"]>).map((channel) => (
-                <label key={channel}>
-                  <input
-                    type="checkbox"
-                    checked={reminderSettings.channels[channel]}
-                    onChange={(event) =>
-                      setReminderSettings({
-                        ...reminderSettings,
-                        channels: {
-                          ...reminderSettings.channels,
-                          [channel]: event.target.checked
-                        }
-                      })
-                    }
-                  />
-                  {channel === "sms" ? "SMS" : channel === "push" ? "Browser push" : "Email"}
-                </label>
-              ))}
-            </div>
-            <div className="packet-actions">
-              <button className="primary-button" type="button" onClick={queueAssignmentDataReminder}>
-                <Sparkles size={16} /> Queue reminder draft
-              </button>
-              <button className="ghost-button" type="button" onClick={markAssignmentReminderChecked}>
-                Checked today
-              </button>
-            </div>
-            <p className="integration-note">
-              Email needs a provider such as Resend or SendGrid. SMS needs a provider such as Twilio. Browser push needs a service worker/PWA permission flow.
-            </p>
-          </article>
-
-          <article className="overview-panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Recruiting</p>
-                <h3>Priority pipeline</h3>
-              </div>
-              <a className="text-link" href="#available-listings">Available listings</a>
-            </div>
-            <div className="mini-list">
-              {applicationList.slice(0, 3).map((application) => (
-                <div key={`overview-${application.company}`}>
-                  <strong>{application.company}</strong>
-                  <span>{application.role}</span>
-                  <em>{application.next}</em>
+                <div>
+                  <div className="section-kicker">
+                    <strong>Events</strong>
+                    <span>{upcomingCalendarEntries.length} upcoming</span>
+                  </div>
+                  <div className="mini-list">
+                    {upcomingCalendarEntries.slice(0, 4).map((entry) => (
+                      <div key={`dashboard-event-${entry.id || entry.title}`}>
+                        <strong>{entry.title}</strong>
+                        <span>{entry.courseName || entry.eventType.replace("_", " ")} · {formatCalendarEntryTime(entry)}</span>
+                        {entry.googleEventUrl ? (
+                          <a className="text-link" href={entry.googleEventUrl} target="_blank" rel="noreferrer">
+                            Add to Google Calendar
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                  {upcomingCalendarEntries.length === 0 ? (
+                    <div className="empty-state">
+                      <strong>No calendar entries.</strong>
+                      <span>Add study blocks, interviews, and reminders from Calendar.</span>
+                    </div>
+                  ) : null}
                 </div>
-              ))}
-            </div>
-          </article>
+              </div>
+            </article>
 
-          <article className="overview-panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">School</p>
-                <h3>Fall 2026 schedule</h3>
-              </div>
-              <a className="text-link" href="#school">Edit courses</a>
-            </div>
-            <div className="mini-list">
-              {courseList.slice(0, 4).map((course) => (
-                <div key={`overview-${course.course}`}>
-                  <strong>{course.course}</strong>
-                  <span>{course.time}</span>
-                  <em>{course.location}</em>
+            <aside className="dashboard-side-stack">
+              <article className="overview-panel">
+                <div className="panel-header">
+                  <div>
+                    <p className="eyebrow">Recruiting</p>
+                    <h3>Next application</h3>
+                  </div>
+                  <a className="text-link" href="#available-listings">Listings</a>
                 </div>
-              ))}
-            </div>
-          </article>
+                <strong className="panel-lead">{strongestMatch ? strongestMatch.role : "No live match yet"}</strong>
+                <p className="panel-note">
+                  {strongestMatch ? `${strongestMatch.company} · ${strongestMatch.fit}% resume match` : "Run live APIs or refine resume keywords."}
+                </p>
+              </article>
 
-          <article className="overview-panel academic-summary">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Academic record</p>
-                <h3>GPA and completed courses</h3>
-              </div>
-              <a className="text-link" href="#school">School page</a>
-            </div>
-            <div className="academic-snapshot">
-              <div>
-                <span>{academicStanding.gpaLabel}</span>
-                <strong>{academicStanding.gpa}</strong>
-              </div>
-              <div>
-                <span>Completed</span>
-                <strong>{completedCourseCount}</strong>
-              </div>
-              <div>
-                <span>Left after current term</span>
-                <strong>{coursesLeftAfterCurrentTerm}</strong>
-              </div>
-            </div>
-            <div className="mini-list">
-              {academicStanding.completedCourses.slice(0, 3).map((course) => (
-                <div key={`academic-${course.code}`}>
-                  <strong>{course.code}</strong>
-                  <span>{course.title}</span>
-                  <em>{course.area} · {course.source}</em>
+              <article className="overview-panel reminder-panel compact-reminder">
+                <div className="panel-header">
+                  <div>
+                    <p className="eyebrow">Reminder</p>
+                    <h3>Assignment data</h3>
+                  </div>
+                  <span className={`provider-pill ${assignmentFreshness.isStale ? "error" : "ok"}`}>
+                    {assignmentFreshness.isStale ? "Needs check" : "Fresh"}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </article>
+                <div className="reminder-status">
+                  <Clock3 size={18} />
+                  <div>
+                    <strong>{assignmentFreshness.label}</strong>
+                    <span>{assignmentFreshness.detail}</span>
+                  </div>
+                </div>
+                <div className="packet-actions">
+                  <button className="ghost-button" type="button" onClick={markAssignmentReminderChecked}>
+                    Checked today
+                  </button>
+                  <button className="ghost-button" type="button" onClick={queueAssignmentDataReminder}>
+                    Queue draft
+                  </button>
+                </div>
+              </article>
 
-          <article className="overview-panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Navigate360</p>
-                <h3>Action queue</h3>
-              </div>
-              <span className="progress-pill">{navigateTasks.length} items</span>
-            </div>
-            <div className="mini-list">
-              {navigateTasks.slice(0, 4).map((task) => (
-                <div key={`overview-${task.title}`}>
-                  <strong>{task.title}</strong>
-                  <span>{task.type} · {task.priority}</span>
-                  <em>{task.date}</em>
+              <article className="overview-panel">
+                <div className="panel-header">
+                  <div>
+                    <p className="eyebrow">Academic record</p>
+                    <h3>Standing</h3>
+                  </div>
+                  <a className="text-link" href="#school">School</a>
                 </div>
-              ))}
-            </div>
-          </article>
+                <div className="academic-snapshot">
+                  <div>
+                    <span>{academicStanding.gpaLabel}</span>
+                    <strong>{academicStanding.gpa}</strong>
+                  </div>
+                  <div>
+                    <span>Completed</span>
+                    <strong>{completedCourseCount}</strong>
+                  </div>
+                  <div>
+                    <span>Left</span>
+                    <strong>{coursesLeftAfterCurrentTerm}</strong>
+                  </div>
+                </div>
+              </article>
+            </aside>
+          </section>
+
+          <section className="dashboard-context-grid">
+            <article className="overview-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Courses</p>
+                  <h3>Current semester</h3>
+                </div>
+                <span className="progress-pill">{courseList.length} courses</span>
+              </div>
+              <div className="mini-list">
+                {courseList.slice(0, 4).map((course) => (
+                  <div key={`overview-${course.course}`}>
+                    <strong>{course.course}</strong>
+                    <span>{course.time}</span>
+                    <em>{course.location}</em>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="overview-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Navigate360</p>
+                  <h3>Action queue</h3>
+                </div>
+                <span className="progress-pill">{highPriorityTasks.length} high priority</span>
+              </div>
+              <div className="mini-list">
+                {navigateTasks.slice(0, 3).map((task) => (
+                  <div key={`overview-${task.title}`}>
+                    <strong>{task.title}</strong>
+                    <span>{task.type} · {task.priority}</span>
+                    <em>{task.date}</em>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
         </section>
 
         <section className={`panel due-calendar-page ${currentPage === "calendar" ? "" : "hidden-page"}`} id="calendar">

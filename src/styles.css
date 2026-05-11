@@ -301,6 +301,172 @@ button {
   gap: 14px;
 }
 
+.dashboard-redesign {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-focus-card,
+.dashboard-pulse > div,
+.workload-panel,
+.dashboard-side-stack .overview-panel,
+.dashboard-context-grid .overview-panel {
+  background: #ffffff;
+  border: 1px solid #d8edf5;
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(11, 47, 71, 0.06);
+}
+
+.dashboard-focus-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(11, 47, 71, 0.96), rgba(11, 117, 165, 0.88)),
+    #0b2f47;
+  color: #ffffff;
+}
+
+.dashboard-focus-card .eyebrow,
+.dashboard-focus-card p {
+  color: #dff6ff;
+}
+
+.dashboard-focus-card h2 {
+  max-width: 820px;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.6rem, 2.4vw, 2.45rem);
+  line-height: 1.08;
+}
+
+.dashboard-focus-card p {
+  max-width: 900px;
+  margin: 12px 0 0;
+  line-height: 1.5;
+}
+
+.focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.focus-actions .primary-button,
+.focus-actions .ghost-button {
+  min-width: 150px;
+  text-decoration: none;
+}
+
+.dashboard-pulse {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-pulse > div {
+  display: grid;
+  gap: 4px;
+  min-height: 104px;
+  padding: 14px;
+  border-top: 4px solid #41b6e6;
+}
+
+.dashboard-pulse > div.needs-attention {
+  border-top-color: #e4002b;
+}
+
+.dashboard-pulse span {
+  color: #587083;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-pulse strong {
+  overflow: hidden;
+  color: #0b2f47;
+  font-size: 1.7rem;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-pulse em {
+  overflow: hidden;
+  color: #5e7180;
+  font-size: 0.86rem;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.55fr);
+  gap: 16px;
+}
+
+.workload-panel {
+  padding: 18px;
+  border-top: 4px solid #e4002b;
+}
+
+.workload-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.section-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.section-kicker strong {
+  color: #0b2f47;
+}
+
+.section-kicker span {
+  color: #5e7180;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.dashboard-side-stack,
+.dashboard-context-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-context-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel-lead {
+  display: block;
+  color: #0b2f47;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.panel-note {
+  margin: 8px 0 0;
+  color: #5e7180;
+  line-height: 1.45;
+}
+
+.compact-reminder .packet-actions {
+  margin-top: 12px;
+}
+
 .command-primary,
 .command-card {
   padding: 18px;
@@ -1971,6 +2137,10 @@ button.application-link {
   .hero-panel,
   .dashboard-command,
   .dashboard-overview-grid,
+  .dashboard-focus-card,
+  .dashboard-main-grid,
+  .dashboard-context-grid,
+  .workload-columns,
   .two-column,
   .three-column,
   .calendar-layout,
@@ -1979,6 +2149,7 @@ button.application-link {
   }
 
   .metric-grid,
+  .dashboard-pulse,
   .listing-grid,
   .packet-grid,
   .resume-grid,
@@ -2062,7 +2233,12 @@ button.application-link {
   }
 
   .metric-grid,
+  .dashboard-pulse,
   .dashboard-overview-grid,
+  .dashboard-focus-card,
+  .dashboard-main-grid,
+  .dashboard-context-grid,
+  .workload-columns,
   .listing-grid,
   .packet-grid,
   .course-form,
@@ -2073,6 +2249,14 @@ button.application-link {
   .resource-grid,
   .advisor-mode-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-focus-card {
+    padding: 20px;
+  }
+
+  .focus-actions {
+    justify-content: flex-start;
   }
 
   .calendar-weekdays,
