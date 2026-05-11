@@ -102,10 +102,10 @@ function normalizeListing(raw, provider) {
     raw.extensions?.join(" ") ||
     "Live job posting imported from the configured job source.";
   const url =
+    raw.final_url ||
     raw.url ||
     raw.apply_url ||
     raw.application_url ||
-    raw.final_url ||
     raw.redirect_url ||
     raw.related_links?.[0]?.link ||
     raw.share_link ||
@@ -152,6 +152,16 @@ function dedupe(listings) {
   });
 }
 
+async function providerError(response, provider) {
+  const text = await response.text();
+  try {
+    const payload = JSON.parse(text);
+    return payload.error?.description || payload.error?.title || `${provider} returned ${response.status}.`;
+  } catch {
+    return text ? `${provider} returned ${response.status}: ${text.slice(0, 180)}` : `${provider} returned ${response.status}.`;
+  }
+}
+
 async function fetchTheirStack(search) {
   if (!providerConfig.theirStack) {
     return { provider: "TheirStack", status: "missing_key", message: "Set THEIRSTACK_API_KEY to enable TheirStack.", listings: [] };
@@ -164,19 +174,18 @@ async function fetchTheirStack(search) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      limit: 50,
+      limit: 25,
       page: 0,
       posted_at_max_age_days: 30,
       job_country_code_or: ["US"],
-      job_location_pattern_or: ["Chicago", "United States", "Remote"],
-      job_title_pattern_or: search.titles,
-      job_description_pattern_or: search.descriptionTerms,
-      employment_type_or: ["Internship"]
+      job_location_pattern_or: ["Chicago", "Remote"],
+      job_title_or: search.titles,
+      employment_statuses_or: ["internship"]
     })
   });
 
   if (!response.ok) {
-    return { provider: "TheirStack", status: "error", message: `TheirStack returned ${response.status}.`, listings: [] };
+    return { provider: "TheirStack", status: "error", message: await providerError(response, "TheirStack"), listings: [] };
   }
 
   const payload = await response.json();
@@ -204,7 +213,7 @@ async function fetchSerpApi(search) {
   const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
 
   if (!response.ok) {
-    return { provider: "SerpApi", status: "error", message: `SerpApi returned ${response.status}.`, listings: [] };
+    return { provider: "SerpApi", status: "error", message: await providerError(response, "SerpApi"), listings: [] };
   }
 
   const payload = await response.json();
@@ -234,7 +243,7 @@ async function fetchJobdata(search) {
   });
 
   if (!response.ok) {
-    return { provider: "JobdataAPI", status: "error", message: `JobdataAPI returned ${response.status}.`, listings: [] };
+    return { provider: "JobdataAPI", status: "error", message: await providerError(response, "JobdataAPI"), listings: [] };
   }
 
   const payload = await response.json();
