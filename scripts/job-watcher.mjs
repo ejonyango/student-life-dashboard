@@ -672,6 +672,90 @@ async function handleClassNotes(request, response) {
   sendJson(response, 200, await saveClassNote(body.note || body));
 }
 
+function mapCalendarEventRow(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    courseName: row.course_name || "",
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    location: row.location || "",
+    notes: row.notes || "",
+    eventType: row.event_type || "study_block",
+    googleEventUrl: row.google_event_url || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+async function listCalendarEvents() {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, database: false, events: [], reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      select calendar_events.*
+      from public.calendar_events
+      join public.student_profiles on student_profiles.id = calendar_events.student_id
+      where student_profiles.slug = 'eric-onyango'
+        and calendar_events.starts_at >= now() - interval '7 days'
+      order by calendar_events.starts_at asc
+      limit 100
+    `
+  );
+
+  return { ok: true, database: true, events: result.rows.map(mapCalendarEventRow) };
+}
+
+async function saveCalendarEvent(event) {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, saved: false, reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.calendar_events (
+        student_id,
+        title,
+        course_name,
+        starts_at,
+        ends_at,
+        location,
+        notes,
+        event_type,
+        google_event_url,
+        updated_at
+      )
+      values ((select id from student), $1, $2, nullif($3, '')::timestamptz, nullif($4, '')::timestamptz, $5, $6, $7, $8, now())
+      returning *
+    `,
+    [
+      event.title || "Calendar event",
+      event.courseName || event.course_name || "",
+      event.startsAt || event.starts_at || "",
+      event.endsAt || event.ends_at || event.startsAt || event.starts_at || "",
+      event.location || "",
+      event.notes || "",
+      event.eventType || event.event_type || "study_block",
+      event.googleEventUrl || event.google_event_url || ""
+    ]
+  );
+
+  return { ok: true, saved: true, event: mapCalendarEventRow(result.rows[0]) };
+}
+
+async function handleCalendarEvents(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, await listCalendarEvents());
+    return;
+  }
+
+  const body = await readBody(request);
+  sendJson(response, 200, await saveCalendarEvent(body.event || body));
+}
+
 function mapAgentActionRow(row) {
   return {
     id: row.id,
@@ -1887,6 +1971,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/class-notes" && (request.method === "GET" || request.method === "POST")) {
       await handleClassNotes(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/calendar-events" && (request.method === "GET" || request.method === "POST")) {
+      await handleCalendarEvents(request, response);
       return;
     }
 

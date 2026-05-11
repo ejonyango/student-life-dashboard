@@ -847,6 +847,11 @@ button {
   background: #e7f8ef;
 }
 
+.due-chip.event {
+  color: #0b2f47;
+  background: #dceff6;
+}
+
 .due-chip.more {
   color: #5e7180;
   background: #eef3f6;

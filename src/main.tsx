@@ -235,6 +235,21 @@ type CalendarDueDay = {
   dateKey: string;
   inMonth: boolean;
   assignments: AssignmentTask[];
+  events: CalendarEntry[];
+};
+
+type CalendarEntry = {
+  id?: string;
+  title: string;
+  courseName: string;
+  startsAt: string;
+  endsAt: string;
+  location: string;
+  notes: string;
+  eventType: "study_block" | "class_event" | "interview" | "deadline" | "personal";
+  googleEventUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type ApplicationPacket = {
@@ -952,6 +967,7 @@ function App() {
   const [advisorStatus, setAdvisorStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [notebookPacket, setNotebookPacket] = useState("");
   const [assignmentTasks, setAssignmentTasks] = useState<AssignmentTask[]>([]);
+  const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(() => loadReminderSettings());
   const [classNotes, setClassNotes] = useState<ClassNote[]>([]);
@@ -972,6 +988,15 @@ function App() {
     content: "",
     tags: []
   });
+  const [calendarEntryForm, setCalendarEntryForm] = useState<CalendarEntry>({
+    title: "",
+    courseName: "",
+    startsAt: "",
+    endsAt: "",
+    location: "",
+    notes: "",
+    eventType: "study_block"
+  });
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -988,8 +1013,9 @@ function App() {
   const totalKnownProgramCourses = completedCourseCount + plannedCourseCount;
   const coursesLeftAfterCurrentTerm = Math.max(0, plannedCourseCount - registeredCourseCount);
   const upcomingAssignments = getUpcomingAssignments(assignmentTasks);
+  const upcomingCalendarEntries = getUpcomingCalendarEntries(calendarEntries);
   const assignmentFreshness = getAssignmentFreshness(assignmentTasks, reminderSettings.lastCheckedAt);
-  const calendarDays = buildDueCalendar(calendarMonth, assignmentTasks);
+  const calendarDays = buildDueCalendar(calendarMonth, assignmentTasks, calendarEntries);
   const calendarMonthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const dueThisMonth = assignmentTasks.filter((assignment) => {
     const dueDate = parseAssignmentDueDate(assignment);
@@ -1034,12 +1060,14 @@ function App() {
 
     async function syncAdvisorContext() {
       try {
-        const [assignmentResponse, noteResponse] = await Promise.all([
+        const [assignmentResponse, noteResponse, calendarResponse] = await Promise.all([
           fetch("http://localhost:8787/api/assignments"),
-          fetch("http://localhost:8787/api/class-notes")
+          fetch("http://localhost:8787/api/class-notes"),
+          fetch("http://localhost:8787/api/calendar-events")
         ]);
         const assignmentPayload = assignmentResponse.ok ? await assignmentResponse.json() : { assignments: [] };
         const notePayload = noteResponse.ok ? await noteResponse.json() : { notes: [] };
+        const calendarPayload = calendarResponse.ok ? await calendarResponse.json() : { events: [] };
 
         if (!isMounted) return;
         if (Array.isArray(assignmentPayload.assignments)) {
@@ -1047,6 +1075,9 @@ function App() {
         }
         if (Array.isArray(notePayload.notes)) {
           setClassNotes(notePayload.notes);
+        }
+        if (Array.isArray(calendarPayload.events)) {
+          setCalendarEntries(calendarPayload.events);
         }
       } catch {
         // Advisor context remains local-only if Supabase is unavailable.
@@ -1628,6 +1659,46 @@ function App() {
     });
   }
 
+  async function saveCalendarEntry(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!calendarEntryForm.title.trim() || !calendarEntryForm.startsAt) return;
+
+    const entry = {
+      ...calendarEntryForm,
+      title: calendarEntryForm.title.trim(),
+      courseName: calendarEntryForm.courseName.trim(),
+      endsAt: calendarEntryForm.endsAt || calendarEntryForm.startsAt,
+      googleEventUrl: buildGoogleCalendarUrl(calendarEntryForm)
+    };
+    setCalendarEntries((currentEntries) => [entry, ...currentEntries]);
+
+    try {
+      const response = await fetch("http://localhost:8787/api/calendar-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: entry })
+      });
+      const payload = response.ok ? await response.json() : null;
+      if (payload?.event) {
+        setCalendarEntries((currentEntries) =>
+          currentEntries.map((currentEntry) => currentEntry === entry ? payload.event : currentEntry)
+        );
+      }
+    } catch {
+      // Keep local calendar entries available for the current session.
+    }
+
+    setCalendarEntryForm({
+      title: "",
+      courseName: "",
+      startsAt: "",
+      endsAt: "",
+      location: "",
+      notes: "",
+      eventType: "study_block"
+    });
+  }
+
   function createNotebookLmPacket() {
     const sections = [
       "# Eric Onyango Advisor Source Packet",
@@ -2042,6 +2113,7 @@ function App() {
               <span>{matchedListings.length} matched listings</span>
               <span>{highPriorityTasks.length} high-priority tasks</span>
               <span>{upcomingAssignments.length} calendar due</span>
+              <span>{upcomingCalendarEntries.length} calendar events</span>
               <span>{academicStanding.gpaLabel} {academicStanding.gpa}</span>
             </div>
           </article>
@@ -2099,6 +2171,7 @@ function App() {
           <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
           <Metric label="Navigate tasks" value={String(navigateTasks.length)} detail="Checklist + alerts" />
           <Metric label="Upcoming due" value={String(upcomingAssignments.length)} detail="Saved assignment deadlines" />
+          <Metric label="Calendar events" value={String(upcomingCalendarEntries.length)} detail="Study blocks + interviews" />
           <Metric label="Reminder status" value={assignmentFreshness.isStale ? "Check" : "Current"} detail={assignmentFreshness.label} />
           <Metric
             label="Courses tracked"
@@ -2141,6 +2214,35 @@ function App() {
               <div className="empty-state">
                 <strong>No calendar due dates yet.</strong>
                 <span>Add due items in Calendar or Assignment check-in and they will appear here.</span>
+              </div>
+            ) : null}
+          </article>
+
+          <article className="overview-panel calendar-event-summary">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Calendar entries</p>
+                <h3>Upcoming events</h3>
+              </div>
+              <a className="text-link" href="#calendar">Add event</a>
+            </div>
+            <div className="mini-list">
+              {upcomingCalendarEntries.slice(0, 4).map((entry) => (
+                <div key={`dashboard-event-${entry.id || entry.title}`}>
+                  <strong>{entry.title}</strong>
+                  <span>{entry.courseName || entry.eventType.replace("_", " ")} · {formatCalendarEntryTime(entry)}</span>
+                  {entry.googleEventUrl ? (
+                    <a className="text-link" href={entry.googleEventUrl} target="_blank" rel="noreferrer">
+                      Add to Google Calendar
+                    </a>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            {upcomingCalendarEntries.length === 0 ? (
+              <div className="empty-state">
+                <strong>No upcoming calendar events.</strong>
+                <span>Add study blocks, reminders, interviews, or class events from the Calendar page.</span>
               </div>
             ) : null}
           </article>
@@ -2366,6 +2468,11 @@ function App() {
                         </em>
                       ))}
                       {day.assignments.length > 3 ? <em className="due-chip more">+{day.assignments.length - 3} more</em> : null}
+                      {day.events.slice(0, 3).map((entry) => (
+                        <em className="due-chip event" key={`${day.dateKey}-${entry.id || entry.title}`}>
+                          {entry.title}
+                        </em>
+                      ))}
                     </div>
                   </article>
                 ))}
@@ -2429,6 +2536,58 @@ function App() {
                   <Save size={16} /> Save due item
                 </button>
               </form>
+              <form className="advisor-subform" onSubmit={saveCalendarEntry}>
+                <strong>Add calendar entry</strong>
+                <select
+                  value={calendarEntryForm.eventType}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, eventType: event.target.value as CalendarEntry["eventType"] })}
+                >
+                  <option value="study_block">Study block</option>
+                  <option value="class_event">Class event</option>
+                  <option value="interview">Interview</option>
+                  <option value="deadline">Deadline</option>
+                  <option value="personal">Personal</option>
+                </select>
+                <select
+                  value={calendarEntryForm.courseName}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, courseName: event.target.value })}
+                >
+                  <option value="">No course / general</option>
+                  {courseList.map((course) => (
+                    <option value={course.course} key={`event-course-${course.id || course.course}`}>
+                      {course.course}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={calendarEntryForm.title}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, title: event.target.value })}
+                  placeholder="Event title"
+                />
+                <input
+                  type="datetime-local"
+                  value={calendarEntryForm.startsAt}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, startsAt: event.target.value })}
+                />
+                <input
+                  type="datetime-local"
+                  value={calendarEntryForm.endsAt}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, endsAt: event.target.value })}
+                />
+                <input
+                  value={calendarEntryForm.location}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, location: event.target.value })}
+                  placeholder="Location or video link"
+                />
+                <textarea
+                  value={calendarEntryForm.notes}
+                  onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, notes: event.target.value })}
+                  placeholder="Notes, prep items, or agenda"
+                />
+                <button className="primary-button" type="submit">
+                  <Save size={16} /> Save event
+                </button>
+              </form>
               <div className="due-list">
                 <div className="panel-header compact">
                   <div>
@@ -2453,6 +2612,29 @@ function App() {
                     <span>Add assignments, exams, readings, or projects so Eric can see what is coming up.</span>
                   </div>
                 ) : null}
+              </div>
+              <div className="due-list">
+                <div className="panel-header compact">
+                  <div>
+                    <p className="eyebrow">Calendar</p>
+                    <h4>Upcoming entries</h4>
+                  </div>
+                  <span className="progress-pill">{upcomingCalendarEntries.length} events</span>
+                </div>
+                {upcomingCalendarEntries.slice(0, 8).map((entry) => (
+                  <article className="due-row" key={`event-${entry.id || entry.title}`}>
+                    <div>
+                      <strong>{entry.title}</strong>
+                      <span>{entry.courseName || entry.eventType.replace("_", " ")} · {formatCalendarEntryTime(entry)}</span>
+                      {entry.location ? <small>{entry.location}</small> : null}
+                    </div>
+                    {entry.googleEventUrl ? (
+                      <a className="text-link" href={entry.googleEventUrl} target="_blank" rel="noreferrer">
+                        Google
+                      </a>
+                    ) : null}
+                  </article>
+                ))}
               </div>
             </aside>
           </div>
@@ -3776,6 +3958,18 @@ function getUpcomingAssignments(assignments: AssignmentTask[]) {
     .map((entry) => entry.assignment);
 }
 
+function getUpcomingCalendarEntries(entries: CalendarEntry[]) {
+  const now = new Date();
+  return entries
+    .map((entry) => ({ entry, startDate: parseCalendarEntryDate(entry.startsAt) }))
+    .filter((item): item is { entry: CalendarEntry; startDate: Date } => item.startDate !== null && item.startDate >= now)
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+    .map((item) => ({
+      ...item.entry,
+      googleEventUrl: item.entry.googleEventUrl || buildGoogleCalendarUrl(item.entry)
+    }));
+}
+
 function getAssignmentFreshness(assignments: AssignmentTask[], lastCheckedAt?: string) {
   const timestamps = [
     ...assignments.map((assignment) => assignment.updatedAt || assignment.createdAt || assignment.dueAt).filter(Boolean),
@@ -3818,7 +4012,7 @@ function formatReminderChannels(settings: ReminderSettings) {
   ].filter(Boolean).join(", ");
 }
 
-function buildDueCalendar(monthDate: Date, assignments: AssignmentTask[]): CalendarDueDay[] {
+function buildDueCalendar(monthDate: Date, assignments: AssignmentTask[], events: CalendarEntry[]): CalendarDueDay[] {
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const gridStart = new Date(monthStart);
   gridStart.setDate(monthStart.getDate() - monthStart.getDay());
@@ -3832,6 +4026,14 @@ function buildDueCalendar(monthDate: Date, assignments: AssignmentTask[]): Calen
     return grouped;
   }, {});
 
+  const eventsByDate = events.reduce<Record<string, CalendarEntry[]>>((grouped, entry) => {
+    const startDate = parseCalendarEntryDate(entry.startsAt);
+    if (!startDate) return grouped;
+    const key = getDateKey(startDate);
+    grouped[key] = [...(grouped[key] || []), entry];
+    return grouped;
+  }, {});
+
   return Array.from({ length: 42 }, (_, index) => {
     const date = new Date(gridStart);
     date.setDate(gridStart.getDate() + index);
@@ -3840,9 +4042,47 @@ function buildDueCalendar(monthDate: Date, assignments: AssignmentTask[]): Calen
       date,
       dateKey,
       inMonth: date.getMonth() === monthDate.getMonth(),
-      assignments: assignmentsByDate[dateKey] || []
+      assignments: assignmentsByDate[dateKey] || [],
+      events: eventsByDate[dateKey] || []
     };
   });
+}
+
+function parseCalendarEntryDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatCalendarEntryTime(entry: CalendarEntry) {
+  const startsAt = parseCalendarEntryDate(entry.startsAt);
+  if (!startsAt) return "Time TBD";
+  const endsAt = parseCalendarEntryDate(entry.endsAt);
+  const startLabel = startsAt.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+  if (!endsAt || endsAt.getTime() === startsAt.getTime()) return startLabel;
+  return `${startLabel} - ${endsAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
+function buildGoogleCalendarUrl(entry: Pick<CalendarEntry, "title" | "startsAt" | "endsAt" | "location" | "notes" | "courseName">) {
+  if (!entry.title || !entry.startsAt) return "";
+  const startsAt = parseCalendarEntryDate(entry.startsAt);
+  if (!startsAt) return "";
+  const endsAt = parseCalendarEntryDate(entry.endsAt) || new Date(startsAt.getTime() + 60 * 60 * 1000);
+  const formatGoogleDate = (date: Date) => date.toISOString().replace(/[-:]|\.\d{3}/g, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: entry.title,
+    dates: `${formatGoogleDate(startsAt)}/${formatGoogleDate(endsAt)}`,
+    details: [entry.courseName ? `Course: ${entry.courseName}` : "", entry.notes || ""].filter(Boolean).join("\n\n"),
+    location: entry.location || ""
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 function formatAssignmentDue(assignment: AssignmentTask) {
