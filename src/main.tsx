@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
   BookOpen,
@@ -79,6 +79,16 @@ type MatchedListing = Listing & {
   matchCount: number;
   matchedTerms: string[];
   fit: number;
+};
+
+const defaultResumeProfile: ResumeProfile = {
+  fileName: "Sample resume profile",
+  text:
+    "Business Analytics major with coursework in Econometrics and Data Structures. Skills include Python, Excel, SQL, data analysis, research, presentation, business writing, and project management. Experience includes analytics project, campus project, customer research, and leadership.",
+  skills: ["python", "excel", "sql", "data analysis", "research", "presentation", "business writing", "project management"],
+  experience: ["analytics project", "campus project", "customer research", "leadership"],
+  major: "business analytics",
+  keywords: ["Chicago", "internship"]
 };
 
 const applications: Application[] = [
@@ -345,20 +355,22 @@ function App() {
     professor: "",
     location: ""
   });
-  const [resumeProfile, setResumeProfile] = useState<ResumeProfile>({
-    fileName: "Sample resume profile",
-    text:
-      "Business Analytics major with coursework in Econometrics and Data Structures. Skills include Python, Excel, SQL, data analysis, research, presentation, business writing, and project management. Experience includes analytics project, campus project, customer research, and leadership.",
-    skills: ["python", "excel", "sql", "data analysis", "research", "presentation", "business writing", "project management"],
-    experience: ["analytics project", "campus project", "customer research", "leadership"],
-    major: "business analytics",
-    keywords: ["Chicago", "internship"]
-  });
+  const [resumeProfile, setResumeProfile] = useState<ResumeProfile>(() => loadResumeProfile());
   const [keywordInput, setKeywordInput] = useState("Chicago, internship");
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
   const weeklyProgress = Math.min(96, 42 + courseList.length * 9);
   const matchedListings = getMatchedListings(resumeProfile);
+  const strongestMatch = matchedListings[0];
+  const savedSignalCount = resumeProfile.skills.length + resumeProfile.experience.length + resumeProfile.keywords.length;
+
+  useEffect(() => {
+    setKeywordInput(resumeProfile.keywords.join(", "));
+  }, [resumeProfile.fileName]);
+
+  useEffect(() => {
+    window.localStorage.setItem("student-life.resume-profile", JSON.stringify(resumeProfile));
+  }, [resumeProfile]);
 
   function addCourse(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -454,8 +466,8 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Sunday, May 10</p>
-            <h1>Today’s command center</h1>
+            <p className="eyebrow">Monday, May 11</p>
+            <h1>Resume-driven dashboard</h1>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" title="Sync connected accounts">
@@ -469,36 +481,40 @@ function App() {
 
         <section className="hero-panel" id="dashboard">
           <div>
-            <p className="eyebrow">AI briefing</p>
-            <h2>Two internship replies need review before tomorrow’s classes.</h2>
+            <p className="eyebrow">Single-student profile</p>
+            <h2>
+              {resumeProfile.major
+                ? `${capitalizeWords(resumeProfile.major)} resume is driving every internship recommendation.`
+                : "Upload the student resume to drive every internship recommendation."}
+            </h2>
             <p>
-              The system is prioritizing recruiter communication, coursework,
-              and one resume update for analytics-focused applications.
+              Skills, experience signals, major or field of study, and added keywords are saved
+              as the profile memory for this student and used to filter Available Listings.
             </p>
           </div>
           <div className="briefing-stack">
             <div>
               <Sparkles size={18} />
-              <span>Best next action</span>
-              <strong>Approve Morningstar interview reply</strong>
+              <span>Top resume match</span>
+              <strong>{strongestMatch ? `${strongestMatch.company}: ${strongestMatch.role}` : "No role matched yet"}</strong>
             </div>
             <div>
               <Clock3 size={18} />
-              <span>Deep work window</span>
-              <strong>7:00 PM - 8:30 PM</strong>
+              <span>Matching rule</span>
+              <strong>At least 2 resume correlations per listing</strong>
             </div>
           </div>
         </section>
 
         <section className="metric-grid" aria-label="Student life metrics">
-          <Metric label="Active applications" value="18" detail="+4 this week" />
+          <Metric label="Resume skills" value={String(resumeProfile.skills.length)} detail="Saved from upload" />
           <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
+          <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
           <Metric
             label="Courses tracked"
             value={String(courseList.length)}
             detail={`${highPriorityCourses} high priority`}
           />
-          <Metric label="Network follow-ups" value="7" detail="3 alumni contacts" />
         </section>
 
         <section className="panel resume-intake" id="resume">
@@ -520,6 +536,7 @@ function App() {
               <span>Current resume</span>
               <strong>{resumeProfile.fileName}</strong>
               <p>Major or field: {resumeProfile.major || "Not detected yet"}</p>
+              <p>Experience signals: {resumeProfile.experience.join(", ") || "None detected yet"}</p>
               <div className="tag-list">
                 {resumeProfile.skills.slice(0, 10).map((skill) => (
                   <span key={skill}>{skill}</span>
@@ -804,6 +821,15 @@ function App() {
   );
 }
 
+function loadResumeProfile(): ResumeProfile {
+  try {
+    const storedProfile = window.localStorage.getItem("student-life.resume-profile");
+    return storedProfile ? { ...defaultResumeProfile, ...JSON.parse(storedProfile) } : defaultResumeProfile;
+  } catch {
+    return defaultResumeProfile;
+  }
+}
+
 function parseResume(text: string, fileName: string, keywords: string[]): ResumeProfile {
   const normalizedText = text.toLowerCase();
   const skills = skillDictionary.filter((skill) => normalizedText.includes(skill));
@@ -818,6 +844,10 @@ function parseResume(text: string, fileName: string, keywords: string[]): Resume
     major,
     keywords
   };
+}
+
+function capitalizeWords(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function normalizeTerms(value: string) {
