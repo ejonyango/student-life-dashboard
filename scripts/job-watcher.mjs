@@ -944,6 +944,73 @@ function postJsonWithTimeout(url, headers, payload, timeoutMs = 20000) {
   });
 }
 
+function getTextWithTimeout(url, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const request = httpsRequest(
+      {
+        hostname: target.hostname,
+        path: `${target.pathname}${target.search}`,
+        method: "GET",
+        headers: {
+          "User-Agent": "student-life-dashboard/0.1"
+        },
+        timeout: timeoutMs
+      },
+      (response) => {
+        let responseBody = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          responseBody += chunk;
+        });
+        response.on("end", () => {
+          resolve({
+            ok: response.statusCode >= 200 && response.statusCode < 300,
+            status: response.statusCode,
+            text: responseBody
+          });
+        });
+      }
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error(`Request timed out after ${timeoutMs / 1000} seconds.`));
+    });
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+function decodeXml(value = "") {
+  return String(value)
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'");
+}
+
+async function fetchRenewableEnergyNews() {
+  const query = encodeURIComponent("renewable energy investment finance markets");
+  const url = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
+  const response = await getTextWithTimeout(url, 12000);
+
+  if (!response.ok) return [];
+
+  return Array.from(response.text.matchAll(/<item>([\s\S]*?)<\/item>/g))
+    .slice(0, 8)
+    .map((match) => {
+      const item = match[1];
+      const title = decodeXml(item.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "");
+      const link = decodeXml(item.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "");
+      const published = decodeXml(item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "");
+      const source = decodeXml(item.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] || "Google News");
+      return { title, link, published, source };
+    })
+    .filter((item) => item.title && item.link);
+}
+
 async function fetchTheirStack(search) {
   if (!providerConfig.theirStack) {
     return { provider: "TheirStack", status: "missing_key", message: "Set THEIRSTACK_API_KEY to enable TheirStack.", listings: [] };
@@ -1208,10 +1275,49 @@ function getDeepSeekRoute(task = "application_packet") {
       model: providerConfig.deepSeekProModel,
       thinking: { type: "enabled", reasoning_effort: "high" },
       timeoutMs: 30000
+    },
+    agent_action: {
+      model: providerConfig.deepSeekFastModel,
+      thinking: { type: "disabled" },
+      timeoutMs: 20000
     }
   };
 
   return routes[task] || routes.application_packet;
+}
+
+function buildAgentActionPrompt(body, route) {
+  return [
+    "TASK: Improve or draft one approval-required agent action for Eric Onyango.",
+    "STUDENT: Eric Onyango, Loyola University Chicago, BBA Finance.",
+    "MODEL ROUTE:",
+    JSON.stringify(route),
+    "",
+    "OUTPUT CONTRACT:",
+    "Return one valid JSON object only. Do not wrap it in markdown.",
+    'Required keys: { "subject": string, "body": string, "approvalChecklist": string[], "riskNotes": string[] }',
+    "",
+    "QUALITY RULES:",
+    "- Keep the result truthful and specific to Eric's finance internship goals.",
+    "- Do not claim anything was sent, submitted, posted, scheduled, or approved.",
+    "- Keep body concise and ready for student review.",
+    "- Include concrete approval checks before the action can be used.",
+    "",
+    "AGENT ACTION JSON:",
+    JSON.stringify(body.action || {}),
+    "",
+    "RESUME PROFILE JSON:",
+    JSON.stringify(body.resumeProfile || {}),
+    "",
+    "BASELINE RESUME JSON:",
+    JSON.stringify(body.baselineResume || {}),
+    "",
+    "COURSES JSON:",
+    JSON.stringify(body.courses || []),
+    "",
+    "CURRENT NEWS ITEMS JSON:",
+    JSON.stringify(body.newsItems || [])
+  ].join("\n");
 }
 
 function buildApplicationPacketPrompt(body, route) {
@@ -1318,6 +1424,98 @@ async function handleApplicationPacket(request, response) {
   }
 }
 
+async function handleAgentActionGenerate(request, response) {
+  const body = await readBody(request);
+  const route = getDeepSeekRoute("agent_action");
+  const action = body.action || {};
+  const newsItems = action.actionType === "renewable_energy_newsletter"
+    ? await fetchRenewableEnergyNews().catch(() => [])
+    : [];
+  const promptBody = { ...body, newsItems };
+
+  if (!providerConfig.deepSeekKey) {
+    sendJson(response, 200, {
+      status: "missing_key",
+      generatedBy: "Template fallback",
+      model: route.model,
+      message: "DeepSeek is not configured.",
+      draft: {
+        subject: action.subject || "Agent action draft",
+        body: action.body || "Draft this action for Eric, then require student approval before use.",
+        approvalChecklist: ["Eric must review before anything is sent or posted."],
+        riskNotes: ["No automatic sending is allowed."]
+      }
+    });
+    return;
+  }
+
+  try {
+    const deepSeekResponse = await postJsonWithTimeout(
+      `${providerConfig.deepSeekBaseUrl}/chat/completions`,
+      {
+        Authorization: `Bearer ${providerConfig.deepSeekKey}`,
+        "Content-Type": "application/json"
+      },
+      {
+        model: route.model,
+        messages: [
+          {
+            role: "system",
+            content: "You draft approval-required student career agent actions. Return valid JSON only."
+          },
+          {
+            role: "user",
+            content: buildAgentActionPrompt(promptBody, route)
+          }
+        ],
+        thinking: route.thinking,
+        response_format: { type: "json_object" },
+        temperature: 0.35
+      },
+      route.timeoutMs
+    );
+
+    if (!deepSeekResponse.ok) {
+      sendJson(response, 200, {
+        status: "fallback",
+        generatedBy: "Fallback parser",
+        model: route.model,
+        message: `DeepSeek returned ${deepSeekResponse.status}.`,
+        draft: {
+          subject: action.subject || "Agent action draft",
+          body: action.body || "Draft this action for Eric, then require student approval before use.",
+          approvalChecklist: ["Eric must review before anything is sent or posted."],
+          riskNotes: ["DeepSeek response was unavailable."]
+        }
+      });
+      return;
+    }
+
+    const payload = JSON.parse(deepSeekResponse.text);
+    const draft = parseJsonBlock(payload.choices?.[0]?.message?.content || "{}");
+    sendJson(response, 200, {
+      status: "ok",
+      generatedBy: "DeepSeek",
+      model: route.model,
+      message: `Agent draft generated with ${route.model}.`,
+      draft
+    });
+  } catch (error) {
+    sendJson(response, 200, {
+      status: "fallback",
+      generatedBy: "Fallback parser",
+      model: route.model,
+      message: error.message || "DeepSeek agent draft failed.",
+      draft: {
+        subject: action.subject || "Agent action draft",
+        body: action.body || "Draft this action for Eric, then require student approval before use.",
+        approvalChecklist: ["Eric must review before anything is sent or posted."],
+        riskNotes: ["AI draft generation failed."]
+      }
+    });
+  }
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     sendJson(response, 200, {});
@@ -1359,6 +1557,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/application-packet" && request.method === "POST") {
       await handleApplicationPacket(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/agent-action-generate" && request.method === "POST") {
+      await handleAgentActionGenerate(request, response);
       return;
     }
 

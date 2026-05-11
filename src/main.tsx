@@ -844,6 +844,7 @@ function App() {
   const [resumeSyncStatus, setResumeSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
   const [agentSyncStatus, setAgentSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
   const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
+  const [generatingAgentId, setGeneratingAgentId] = useState<string>("");
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -1223,6 +1224,7 @@ function App() {
           )
         );
         setAgentSyncStatus("database");
+        void generateAgentActionDraft(payload.action);
       }
     } catch {
       setAgentSyncStatus("local");
@@ -1258,6 +1260,55 @@ function App() {
       setAgentSyncStatus("database");
     } catch {
       setAgentSyncStatus("local");
+    }
+  }
+
+  async function generateAgentActionDraft(action: AgentAction) {
+    setGeneratingAgentId(action.id);
+
+    try {
+      const response = await fetch("http://localhost:8787/api/agent-action-generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action,
+          resumeProfile,
+          baselineResume,
+          courses: courseList
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Agent AI endpoint returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const checklist = Array.isArray(payload.draft?.approvalChecklist) ? payload.draft.approvalChecklist : [];
+      const risks = Array.isArray(payload.draft?.riskNotes) ? payload.draft.riskNotes : [];
+      const generatedBody = [
+        payload.draft?.body || action.body,
+        checklist.length ? `\nApproval checklist:\n- ${checklist.join("\n- ")}` : "",
+        risks.length ? `\nRisk notes:\n- ${risks.join("\n- ")}` : ""
+      ].filter(Boolean).join("\n");
+      const updatedAction: AgentAction = {
+        ...action,
+        subject: payload.draft?.subject || action.subject,
+        body: generatedBody,
+        status: "draft"
+      };
+
+      setAgentActions((currentActions) =>
+        currentActions.map((currentAction) =>
+          currentAction.id === action.id ? updatedAction : currentAction
+        )
+      );
+      await updateAgentActionStatus(updatedAction, "draft");
+    } catch {
+      setAgentSyncStatus("local");
+    } finally {
+      setGeneratingAgentId("");
     }
   }
 
@@ -2209,6 +2260,60 @@ function App() {
                 </article>
               ))}
             </div>
+            <div className="packet-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() =>
+                  void createAgentAction({
+                    actionType: "next_best_action",
+                    subject: "Suggest Eric’s next best career action",
+                    body: "Use Eric’s resume, applications, school load, and finance recruiting goals to draft the next approval-required action."
+                  })
+                }
+              >
+                <Sparkles size={16} /> Ask DeepSeek for next action
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  void createAgentAction({
+                    actionType: "renewable_energy_newsletter",
+                    subject: "Draft renewable energy investing brief",
+                    body: "Create a concise newsletter for Eric with current renewable energy finance, infrastructure, markets, and investment themes. Include source links and why each item matters for a BBA Finance student."
+                  })
+                }
+              >
+                Renewable investing brief
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  void createAgentAction({
+                    actionType: "assignment_checkin",
+                    subject: "Ask Eric for assignment updates",
+                    body: "Review Eric’s saved courses and draft a short check-in asking what assignments, exams, or projects changed this week."
+                  })
+                }
+              >
+                Assignment check-in
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  void createAgentAction({
+                    actionType: "assignment_research_advisor",
+                    subject: "Start assignment research advisor",
+                    body: "Draft an advisor-style response that asks Eric what class and assignment he wants help with, then proposes a research plan using course context."
+                  })
+                }
+              >
+                Research advisor
+              </button>
+            </div>
             <div className="agent-list">
               {agentActions.map((action) => (
                 <article className="agent-row" key={action.id}>
@@ -2221,6 +2326,14 @@ function App() {
                   </div>
                   <em>{action.status}</em>
                   <div className="application-actions">
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => void generateAgentActionDraft(action)}
+                      disabled={generatingAgentId === action.id}
+                    >
+                      {generatingAgentId === action.id ? "Generating" : "Generate with AI"}
+                    </button>
                     {action.status === "draft" ? (
                       <button className="ghost-button" type="button" onClick={() => void updateAgentActionStatus(action, "approved")}>
                         Approve
