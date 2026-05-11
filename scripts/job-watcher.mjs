@@ -16,7 +16,9 @@ const MAX_RESULTS = 500;
 
 const providerConfig = {
   theirStack: process.env.THEIRSTACK_API_KEY || "",
-  serpApi: process.env.SERPAPI_API_KEY || ""
+  serpApi: process.env.SERPAPI_API_KEY || "",
+  adzunaAppId: process.env.ADZUNA_APP_ID || "",
+  adzunaAppKey: process.env.ADZUNA_APP_KEY || ""
 };
 
 function sendJson(response, status, payload) {
@@ -65,6 +67,7 @@ function compact(value, fallback = "Unknown") {
 function sourceBoard(provider) {
   if (provider === "theirstack") return "TheirStack";
   if (provider === "serpapi") return "SerpApi";
+  if (provider === "adzuna") return "Adzuna";
   return "Company Careers";
 }
 
@@ -79,6 +82,7 @@ function splitTerms(value) {
 function normalizeListing(raw, provider) {
   const title = raw.title || raw.job_title || raw.name || raw.position || "Internship";
   const company =
+    raw.company?.display_name ||
     raw.company ||
     raw.company_name ||
     raw.company_object?.name ||
@@ -86,6 +90,8 @@ function normalizeListing(raw, provider) {
     raw.employer_name ||
     "Unknown company";
   const location =
+    raw.location?.display_name ||
+    raw.location?.area?.join(", ") ||
     raw.location ||
     raw.job_location ||
     raw.locations_derived?.join(", ") ||
@@ -102,9 +108,9 @@ function normalizeListing(raw, provider) {
   const url =
     raw.final_url ||
     raw.url ||
+    raw.redirect_url ||
     raw.apply_url ||
     raw.application_url ||
-    raw.redirect_url ||
     raw.related_links?.[0]?.link ||
     raw.share_link ||
     raw.job_apply_link ||
@@ -230,6 +236,43 @@ async function fetchSerpApi(search) {
   };
 }
 
+async function fetchAdzuna(search) {
+  if (!providerConfig.adzunaAppId || !providerConfig.adzunaAppKey) {
+    return { provider: "Adzuna", status: "missing_key", message: "Set ADZUNA_APP_ID and ADZUNA_APP_KEY to enable Adzuna.", listings: [] };
+  }
+
+  const responses = await Promise.all(
+    search.adzunaQueries.map(async (query) => {
+      const params = new URLSearchParams({
+        app_id: providerConfig.adzunaAppId,
+        app_key: providerConfig.adzunaAppKey,
+        results_per_page: "20",
+        what: query,
+        where: "Chicago",
+        max_days_old: "30",
+        sort_by: "date",
+        "content-type": "application/json"
+      });
+      const response = await fetch(`https://api.adzuna.com/v1/api/jobs/us/search/1?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error(await providerError(response, "Adzuna"));
+      }
+
+      const payload = await response.json();
+      return payload.results || [];
+    })
+  );
+  const jobs = responses.flat();
+
+  return {
+    provider: "Adzuna",
+    status: "ok",
+    message: `${jobs.length} jobs returned.`,
+    listings: jobs.map((job) => normalizeListing(job, "adzuna"))
+  };
+}
+
 function buildSearch(body) {
   const terms = [
     ...(body.skills || []),
@@ -256,6 +299,12 @@ function buildSearch(body) {
       "capital markets intern Chicago",
       "treasury intern Chicago"
     ],
+    adzunaQueries: [
+      "finance intern",
+      "investment banking summer analyst",
+      "capital markets intern",
+      "treasury intern"
+    ],
     titles: [
       "finance intern",
       "investment banking intern",
@@ -273,13 +322,14 @@ async function handleJobSearch(request, response) {
   const search = buildSearch(body);
   const settled = await Promise.allSettled([
     fetchTheirStack(search),
-    fetchSerpApi(search)
+    fetchSerpApi(search),
+    fetchAdzuna(search)
   ]);
 
   const providerResults = settled.map((result, index) => {
     if (result.status === "fulfilled") return result.value;
     return {
-      provider: ["TheirStack", "SerpApi"][index],
+      provider: ["TheirStack", "SerpApi", "Adzuna"][index],
       status: "error",
       message: result.reason?.message || "Provider request failed.",
       listings: []
@@ -314,7 +364,8 @@ const server = createServer(async (request, response) => {
         ok: true,
         providers: {
           theirStack: Boolean(providerConfig.theirStack),
-          serpApi: Boolean(providerConfig.serpApi)
+          serpApi: Boolean(providerConfig.serpApi),
+          adzuna: Boolean(providerConfig.adzunaAppId && providerConfig.adzunaAppKey)
         }
       });
       return;

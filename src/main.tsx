@@ -60,7 +60,7 @@ type Listing = {
   company: string;
   role: string;
   location: string;
-  sourceBoard: "LinkedIn" | "Handshake" | "Indeed" | "Company Careers" | "TheirStack" | "SerpApi";
+  sourceBoard: "LinkedIn" | "Handshake" | "Indeed" | "Company Careers" | "TheirStack" | "SerpApi" | "Adzuna";
   sourceDescription: string;
   companyVerification: string;
   applicationLink: string;
@@ -1302,6 +1302,7 @@ function App() {
                 <>
                   <span className="provider-pill missing_key">TheirStack: not checked</span>
                   <span className="provider-pill missing_key">SerpApi: not checked</span>
+                  <span className="provider-pill missing_key">Adzuna: not checked</span>
                 </>
               )}
             </div>
