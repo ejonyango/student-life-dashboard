@@ -908,6 +908,7 @@ function App() {
   const [advisorPrompt, setAdvisorPrompt] = useState("Renewable energy investment trends, project finance, grid constraints, policy, and M&A themes Eric should understand this week.");
   const [advisorResult, setAdvisorResult] = useState<AdvisorResult | null>(null);
   const [advisorStatus, setAdvisorStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [notebookPacket, setNotebookPacket] = useState("");
   const [assignmentTasks, setAssignmentTasks] = useState<AssignmentTask[]>([]);
   const [classNotes, setClassNotes] = useState<ClassNote[]>([]);
   const [assignmentForm, setAssignmentForm] = useState<AssignmentTask>({
@@ -1557,6 +1558,70 @@ function App() {
       content: "",
       tags: []
     });
+  }
+
+  function createNotebookLmPacket() {
+    const sections = [
+      "# Eric Onyango Advisor Source Packet",
+      "",
+      `Generated: ${new Date().toLocaleString()}`,
+      "",
+      "## Advisor Mode",
+      advisorModes[advisorTask].label,
+      "",
+      "## Current Question",
+      advisorPrompt,
+      "",
+      "## Resume Context",
+      `Major: ${resumeProfile.major || "Not detected"}`,
+      `Skills: ${resumeProfile.skills.join(", ") || "None saved"}`,
+      `Baseline status: ${baselineResume.status} (${baselineResume.updatedAt})`,
+      "",
+      "## Assignments",
+      assignmentTasks.length
+        ? assignmentTasks.map((assignment) =>
+          `- ${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}\n  Priority: ${assignment.priority}\n  Details: ${assignment.details || "None"}`
+        ).join("\n")
+        : "No assignments saved yet.",
+      "",
+      "## Class Notes And Transcripts",
+      classNotes.length
+        ? classNotes.map((note) =>
+          `### ${note.courseName}: ${note.title}\nType: ${note.noteType.replace("_", " ")}\n\n${note.content}`
+        ).join("\n\n")
+        : "No class notes saved yet.",
+      "",
+      "## Advisor Output",
+      advisorResult
+        ? [
+          advisorResult.subject ? `### ${advisorResult.subject}` : "",
+          advisorResult.body || "",
+          formatNotebookSection("Trend themes", advisorResult.trendThemes),
+          formatNotebookSection("Important developments", advisorResult.importantDevelopments),
+          formatNotebookSection("Industry impact", advisorResult.industryImpacts),
+          formatNotebookSection("Investment angles", advisorResult.investmentAngles),
+          formatNotebookSection("Source notes", advisorResult.sourceNotes),
+          formatNotebookSection("Action plan", advisorResult.actionPlan),
+          formatNotebookSection("Schedule blocks", advisorResult.scheduleBlocks),
+          formatNotebookSection("Research plan", advisorResult.researchPlan),
+          formatNotebookSection("Suggested sources", advisorResult.suggestedSources),
+          formatNotebookSection("Search keywords", advisorResult.searchKeywords),
+          formatNotebookSection("Clarifying questions", advisorResult.clarifyingQuestions)
+        ].filter(Boolean).join("\n\n")
+        : "Run the Advisor first to include generated analysis."
+    ];
+
+    setNotebookPacket(sections.join("\n"));
+  }
+
+  async function copyNotebookLmPacket() {
+    if (!notebookPacket) return;
+
+    try {
+      await navigator.clipboard.writeText(notebookPacket);
+    } catch {
+      // The packet remains visible for manual copying when clipboard access is blocked.
+    }
   }
 
   async function runLiveJobSearch() {
@@ -2807,6 +2872,24 @@ function App() {
                   items={classNotes.slice(0, 6).map((note) => `${note.courseName}: ${note.title} (${note.noteType.replace("_", " ")})`)}
                 />
               ) : null}
+              <div className="notebooklm-bridge">
+                <div>
+                  <strong>NotebookLM handoff</strong>
+                  <span>Package the current question, assignments, class notes, and Advisor output as one source.</span>
+                </div>
+                <div className="packet-actions">
+                  <button className="ghost-button" type="button" onClick={createNotebookLmPacket}>
+                    Create source packet
+                  </button>
+                  <button className="ghost-button" type="button" onClick={copyNotebookLmPacket} disabled={!notebookPacket}>
+                    Copy packet
+                  </button>
+                  <a className="application-link secondary" href="https://notebooklm.google.com/" target="_blank" rel="noreferrer">
+                    Open NotebookLM <ExternalLink size={16} />
+                  </a>
+                </div>
+                {notebookPacket ? <textarea readOnly value={notebookPacket} /> : null}
+              </div>
             </div>
           </div>
         </section>
@@ -3238,6 +3321,11 @@ function AdvisorList({ title, items }: { title: string; items?: string[] }) {
       </ul>
     </div>
   );
+}
+
+function formatNotebookSection(title: string, items?: string[]) {
+  if (!items?.length) return "";
+  return [`### ${title}`, ...items.map((item) => `- ${item}`)].join("\n");
 }
 
 function ResumeDocument({ resume }: { resume: BaselineResume }) {

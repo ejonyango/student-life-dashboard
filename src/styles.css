@@ -693,6 +693,28 @@ button {
   font-size: 0.9rem;
 }
 
+.notebooklm-bridge {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-left: 4px solid #e4002b;
+  border-radius: 8px;
+}
+
+.notebooklm-bridge span {
+  display: block;
+  margin-top: 4px;
+  color: #5e7180;
+  font-size: 0.9rem;
+}
+
+.notebooklm-bridge textarea {
+  min-height: 220px;
+  resize: vertical;
+}
+
 .advisor-output {
   align-content: start;
 }
