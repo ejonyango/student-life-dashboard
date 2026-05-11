@@ -819,6 +819,24 @@ const statusClass: Record<Application["status"], string> = {
   "Offer prep": "green"
 };
 
+const advisorModes: Record<AdvisorTask, { label: string; detail: string; prompt: string }> = {
+  intelligence_brief: {
+    label: "Intelligence brief",
+    detail: "Trends, developments, industry impact, and investment angles.",
+    prompt: "Renewable energy investment trends, project finance, grid constraints, policy, and M&A themes Eric should understand this week."
+  },
+  assignment_checkin: {
+    label: "Assignment check-in",
+    detail: "Ask what changed across classes and surface study priorities.",
+    prompt: "Review Eric’s saved courses and ask what assignments, exams, readings, or projects changed this week. Help him prioritize next steps."
+  },
+  research_advisor: {
+    label: "Research advisor",
+    detail: "Turn an assignment question into a research plan and source strategy.",
+    prompt: "Help Eric scope a class assignment or research question. Ask clarifying questions if needed, then propose a research plan, keywords, and credible source types."
+  }
+};
+
 const pageTitles: Record<Page, string> = {
   dashboard: "Eric’s Dashboard",
   "available-listings": "Available Listings",
@@ -1346,6 +1364,13 @@ function App() {
     void createAgentAction({ actionType, subject, body });
     setCurrentPage("agents");
     window.location.hash = "agents";
+  }
+
+  function selectAdvisorTask(task: AdvisorTask) {
+    setAdvisorTask(task);
+    setAdvisorPrompt(advisorModes[task].prompt);
+    setAdvisorResult(null);
+    setAdvisorStatus("idle");
   }
 
   async function runAdvisorTask() {
@@ -2505,17 +2530,28 @@ function App() {
           </div>
           <div className="advisor-grid">
             <div className="advisor-controls">
-              <label>
-                Advisor mode
-                <select value={advisorTask} onChange={(event) => setAdvisorTask(event.target.value as AdvisorTask)}>
-                  <option value="intelligence_brief">Intelligence brief</option>
-                  <option value="assignment_checkin">Assignment check-in</option>
-                  <option value="research_advisor">Research advisor</option>
-                </select>
-              </label>
-              <label>
-                Topic or question
-                <textarea value={advisorPrompt} onChange={(event) => setAdvisorPrompt(event.target.value)} />
+              <div className="advisor-mode-grid" role="tablist" aria-label="Advisor mode">
+                {(Object.entries(advisorModes) as Array<[AdvisorTask, typeof advisorModes[AdvisorTask]]>).map(([mode, config]) => (
+                  <button
+                    className={`advisor-mode ${advisorTask === mode ? "active" : ""}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={advisorTask === mode}
+                    key={mode}
+                    onClick={() => selectAdvisorTask(mode)}
+                  >
+                    <strong>{config.label}</strong>
+                    <span>{config.detail}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="advisor-prompt">
+                <span>Topic or question</span>
+                <textarea
+                  value={advisorPrompt}
+                  onChange={(event) => setAdvisorPrompt(event.target.value)}
+                  placeholder={advisorModes[advisorTask].prompt}
+                />
               </label>
               <button className="primary-button" type="button" onClick={runAdvisorTask} disabled={advisorStatus === "loading"}>
                 <Sparkles size={16} /> {advisorStatus === "loading" ? "Generating" : "Run advisor"}
