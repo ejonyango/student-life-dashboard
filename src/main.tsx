@@ -33,6 +33,7 @@ import "./styles.css";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 type Application = {
+  id?: string;
   company: string;
   role: string;
   status: "Applied" | "Interview" | "Drafting" | "Follow-up" | "Offer prep";
@@ -41,6 +42,8 @@ type Application = {
   source?: string;
   applicationLink?: string;
   resumeVersion?: string;
+  packetId?: string;
+  packet?: ApplicationPacket | null;
 };
 
 type Lesson = {
@@ -1081,7 +1084,8 @@ function App() {
       fit: applicationPacket.listing.fit,
       source: applicationPacket.listing.sourceBoard,
       applicationLink: applicationPacket.listing.applicationLink,
-      resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`
+      resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`,
+      packet: applicationPacket
     };
     upsertApplication(application);
     void persistApplication(application);
@@ -1100,7 +1104,8 @@ function App() {
       fit: applicationPacket.listing.fit,
       source: applicationPacket.listing.sourceBoard,
       applicationLink: applicationPacket.listing.applicationLink,
-      resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`
+      resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`,
+      packet: applicationPacket
     };
     upsertApplication(application);
     void persistApplication(application);
@@ -1118,6 +1123,15 @@ function App() {
     if (!openedWindow) {
       window.location.href = url;
     }
+  }
+
+  function viewSavedPacket(application: Application) {
+    if (!application.packet) return;
+
+    setApplicationPacket(application.packet);
+    setPacketStatus("ready");
+    setCurrentPage("available-listings");
+    window.location.hash = "available-listings";
   }
 
   return (
@@ -1651,6 +1665,11 @@ function App() {
                   <span style={{ width: `${application.fit}%` }} />
                 </div>
                 <p>{application.next}</p>
+                {application.packet ? (
+                  <button className="ghost-button" type="button" onClick={() => viewSavedPacket(application)}>
+                    View packet
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>

@@ -169,6 +169,11 @@ function mapApplicationRow(row) {
     source: row.source || "",
     applicationLink: row.application_link || "",
     resumeVersion: row.resume_version || "",
+    packetId: row.packet_id || "",
+    packet: row.packet || null,
+    packetGeneratedBy: row.packet_generated_by || "",
+    packetModel: row.packet_model || "",
+    packetAiStatus: row.packet_ai_status || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     appliedAt: row.applied_at
@@ -192,11 +197,17 @@ async function listApplicationRecords() {
         applications.fit,
         applications.source,
         applications.application_link,
+        applications.packet_id,
         applications.created_at,
         applications.updated_at,
         applications.applied_at,
+        application_packets.packet,
+        application_packets.generated_by as packet_generated_by,
+        application_packets.model as packet_model,
+        application_packets.ai_status as packet_ai_status,
         coalesce(resume_versions.status || ' baseline', '') as resume_version
       from public.applications
+      left join public.application_packets on application_packets.id = applications.packet_id
       left join public.resume_versions on resume_versions.id = applications.resume_version_id
       join public.student_profiles on student_profiles.id = applications.student_id
       where student_profiles.slug = 'eric-onyango'
@@ -211,67 +222,122 @@ async function listApplicationRecords() {
   };
 }
 
+async function saveApplicationPacketRecord(client, studentId, application) {
+  if (!application.packet) return null;
+
+  const result = await client.query(
+    `
+      insert into public.application_packets (
+        student_id,
+        generated_by,
+        model,
+        ai_status,
+        packet,
+        approved_by_student,
+        approved_at
+      )
+      values ($1, $2, $3, $4, $5::jsonb, $6, case when $6 then now() else null end)
+      returning id
+    `,
+    [
+      studentId,
+      application.packet.generatedBy || "Unknown",
+      application.packet.model || "unknown",
+      application.packet.aiStatus || "draft",
+      JSON.stringify(application.packet),
+      application.status === "Applied"
+    ]
+  );
+
+  return result.rows[0]?.id || null;
+}
+
 async function saveApplicationRecord(application) {
   const pool = getDbPool();
   if (!pool) {
     return { ok: false, saved: false, reason: "database_not_configured" };
   }
 
-  const result = await pool.query(
-    `
-      with student as (
-        select id from public.student_profiles where slug = 'eric-onyango' limit 1
-      )
-      insert into public.applications (
-        student_id,
-        company,
-        role,
-        status,
-        next_step,
-        fit,
-        source,
-        application_link,
-        updated_at,
-        applied_at
-      )
-      values (
-        (select id from student),
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        now(),
-        case when $3 = 'applied' then now() else null end
-      )
-      on conflict (student_id, company, role)
-      do update set
-        status = excluded.status,
-        next_step = excluded.next_step,
-        fit = excluded.fit,
-        source = excluded.source,
-        application_link = excluded.application_link,
-        updated_at = now(),
-        applied_at = case
-          when excluded.status = 'applied' and public.applications.applied_at is null then now()
-          else public.applications.applied_at
-        end
-      returning id, company, role, status, next_step, fit, source, application_link, created_at, updated_at, applied_at
-    `,
-    [
-      application.company,
-      application.role,
-      toDatabaseStatus(application.status),
-      application.next || "",
-      Number(application.fit || 0),
-      application.source || "",
-      application.applicationLink || ""
-    ]
-  );
+  const client = await pool.connect();
 
-  return { ok: true, saved: true, application: result.rows[0] };
+  try {
+    await client.query("begin");
+
+    const studentResult = await client.query(
+      "select id from public.student_profiles where slug = 'eric-onyango' limit 1"
+    );
+    const studentId = studentResult.rows[0]?.id;
+
+    if (!studentId) {
+      throw new Error("Student profile eric-onyango was not found.");
+    }
+
+    const packetId = await saveApplicationPacketRecord(client, studentId, application);
+
+    const result = await client.query(
+      `
+        insert into public.applications (
+          student_id,
+          packet_id,
+          company,
+          role,
+          status,
+          next_step,
+          fit,
+          source,
+          application_link,
+          updated_at,
+          applied_at
+        )
+        values (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          now(),
+          case when $5 = 'applied' then now() else null end
+        )
+        on conflict (student_id, company, role)
+        do update set
+          packet_id = coalesce(excluded.packet_id, public.applications.packet_id),
+          status = excluded.status,
+          next_step = excluded.next_step,
+          fit = excluded.fit,
+          source = excluded.source,
+          application_link = excluded.application_link,
+          updated_at = now(),
+          applied_at = case
+            when excluded.status = 'applied' and public.applications.applied_at is null then now()
+            else public.applications.applied_at
+          end
+        returning id, packet_id, company, role, status, next_step, fit, source, application_link, created_at, updated_at, applied_at
+      `,
+      [
+        studentId,
+        packetId,
+        application.company,
+        application.role,
+        toDatabaseStatus(application.status),
+        application.next || "",
+        Number(application.fit || 0),
+        application.source || "",
+        application.applicationLink || ""
+      ]
+    );
+
+    await client.query("commit");
+    return { ok: true, saved: true, packetSaved: Boolean(packetId), application: result.rows[0] };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function handleListApplications(response) {
