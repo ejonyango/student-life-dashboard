@@ -728,6 +728,8 @@ function App() {
   const weeklyProgress = Math.min(96, 42 + courseList.length * 9);
   const matchedListings = getMatchedListings(resumeProfile);
   const strongestMatch = matchedListings[0];
+  const highPriorityTasks = navigateTasks.filter((task) => task.priority === "High");
+  const nextClass = courseList[0];
   const savedSignalCount = resumeProfile.skills.length + resumeProfile.experience.length + resumeProfile.keywords.length;
 
   useEffect(() => {
@@ -856,7 +858,7 @@ function App() {
           </div>
         </header>
 
-        <section className="hero-panel" id="dashboard">
+        <section className="hero-panel dashboard-hero" id="dashboard">
           <div>
               <p className="eyebrow">Eric Onyango profile</p>
             <h2>
@@ -883,7 +885,41 @@ function App() {
           </div>
         </section>
 
-        <section className="metric-grid" aria-label="Student life metrics">
+        <section className="dashboard-command" aria-label="Eric dashboard command center">
+          <article className="command-primary">
+            <p className="eyebrow">Today’s focus</p>
+            <h3>Keep finance recruiting, Fall registration, and Navigate360 tasks moving together.</h3>
+            <p>
+              Best next move: schedule Career Services and Academic Advisor appointments, then use the
+              approved baseline resume to prepare applications for the strongest finance matches.
+            </p>
+            <div className="command-strip">
+              <span>{baselineResume.status} baseline</span>
+              <span>{matchedListings.length} matched listings</span>
+              <span>{highPriorityTasks.length} high-priority tasks</span>
+            </div>
+          </article>
+
+          <article className="command-card">
+            <span>Top application target</span>
+            <strong>{strongestMatch ? strongestMatch.role : "No match yet"}</strong>
+            <p>{strongestMatch ? `${strongestMatch.company} · ${strongestMatch.fit}% resume match` : "Upload or approve a baseline resume."}</p>
+          </article>
+
+          <article className="command-card">
+            <span>Next class signal</span>
+            <strong>{nextClass.course}</strong>
+            <p>{nextClass.time} · {nextClass.location}</p>
+          </article>
+
+          <article className="command-card alert">
+            <span>Navigate360 action</span>
+            <strong>{highPriorityTasks[0]?.title ?? "No urgent task"}</strong>
+            <p>{highPriorityTasks[0]?.date ?? "All clear"}</p>
+          </article>
+        </section>
+
+        <section className="metric-grid compact-metrics" aria-label="Student life metrics">
           <Metric label="Resume skills" value={String(resumeProfile.skills.length)} detail="Saved from upload" />
           <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
           <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
@@ -894,6 +930,65 @@ function App() {
             value={String(courseList.length)}
             detail={`${highPriorityCourses} high priority`}
           />
+        </section>
+
+        <section className="dashboard-overview-grid">
+          <article className="overview-panel" id="applications">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Recruiting</p>
+                <h3>Priority pipeline</h3>
+              </div>
+              <a className="text-link" href="#available-listings">Available listings</a>
+            </div>
+            <div className="mini-list">
+              {applications.slice(0, 3).map((application) => (
+                <div key={`overview-${application.company}`}>
+                  <strong>{application.company}</strong>
+                  <span>{application.role}</span>
+                  <em>{application.next}</em>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="overview-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">School</p>
+                <h3>Fall 2026 schedule</h3>
+              </div>
+              <a className="text-link" href="#school">Edit courses</a>
+            </div>
+            <div className="mini-list">
+              {courseList.slice(0, 4).map((course) => (
+                <div key={`overview-${course.course}`}>
+                  <strong>{course.course}</strong>
+                  <span>{course.time}</span>
+                  <em>{course.location}</em>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="overview-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Navigate360</p>
+                <h3>Action queue</h3>
+              </div>
+              <span className="progress-pill">{navigateTasks.length} items</span>
+            </div>
+            <div className="mini-list">
+              {navigateTasks.slice(0, 4).map((task) => (
+                <div key={`overview-${task.title}`}>
+                  <strong>{task.title}</strong>
+                  <span>{task.type} · {task.priority}</span>
+                  <em>{task.date}</em>
+                </div>
+              ))}
+            </div>
+          </article>
         </section>
 
         <section className="panel resume-intake" id="resume">
@@ -1035,33 +1130,6 @@ function App() {
         </section>
 
         <section className="two-column">
-          <div className="panel" id="applications">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Pipeline</p>
-              <h3>Eric’s internship pipeline</h3>
-              </div>
-              <button className="ghost-button">View all</button>
-            </div>
-            <div className="application-list">
-              {applications.map((application) => (
-                <article className="application-row" key={`${application.company}-${application.role}`}>
-                  <div>
-                    <strong>{application.company}</strong>
-                    <span>{application.role}</span>
-                  </div>
-                  <span className={`status ${statusClass[application.status]}`}>
-                    {application.status}
-                  </span>
-                  <div className="fit-score" aria-label={`${application.fit}% fit`}>
-                    <span style={{ width: `${application.fit}%` }} />
-                  </div>
-                  <p>{application.next}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
           <div className="panel dashboard-courses">
             <div className="panel-header">
               <div>

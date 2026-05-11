@@ -243,8 +243,19 @@ button {
   gap: 14px;
 }
 
+.compact-metrics .metric-card {
+  padding: 14px 16px;
+}
+
+.compact-metrics .metric-card strong {
+  font-size: 1.6rem;
+}
+
 .metric-card,
-.panel {
+.panel,
+.overview-panel,
+.command-primary,
+.command-card {
   background: #ffffff;
   border: 1px solid #d8edf5;
   border-radius: 8px;
@@ -273,6 +284,139 @@ button {
 .listing-card p {
   margin: 0;
   color: #5e7180;
+}
+
+.dashboard-command {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.3fr) repeat(3, minmax(220px, 0.75fr));
+  gap: 14px;
+}
+
+.command-primary,
+.command-card {
+  padding: 18px;
+}
+
+.command-primary {
+  display: grid;
+  gap: 12px;
+  background:
+    linear-gradient(135deg, rgba(11, 47, 71, 0.96), rgba(11, 117, 165, 0.86)),
+    #0b2f47;
+  color: #ffffff;
+}
+
+.command-primary .eyebrow,
+.command-primary p {
+  color: #dff6ff;
+}
+
+.command-primary h3,
+.command-card strong {
+  margin: 0;
+  color: inherit;
+}
+
+.command-primary h3 {
+  max-width: 780px;
+  font-size: clamp(1.45rem, 2vw, 2.15rem);
+  line-height: 1.1;
+}
+
+.command-primary p,
+.command-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.command-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-strip span {
+  padding: 7px 10px;
+  color: #0b2f47;
+  font-size: 0.82rem;
+  font-weight: 800;
+  background: #ffffff;
+  border-radius: 999px;
+}
+
+.command-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.command-card span {
+  color: #0b75a5;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.command-card strong {
+  color: #0b2f47;
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.command-card p {
+  color: #5e7180;
+}
+
+.command-card.alert {
+  border-left: 4px solid #e4002b;
+}
+
+.dashboard-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-panel {
+  padding: 18px;
+}
+
+.text-link {
+  color: #0b75a5;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mini-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mini-list div {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.mini-list strong,
+.mini-list span,
+.mini-list em {
+  display: block;
+}
+
+.mini-list span,
+.mini-list em {
+  color: #5e7180;
+  font-size: 0.9rem;
+}
+
+.mini-list em {
+  font-style: normal;
 }
 
 .two-column,
@@ -1125,6 +1269,8 @@ button {
   }
 
   .hero-panel,
+  .dashboard-command,
+  .dashboard-overview-grid,
   .two-column,
   .three-column {
     grid-template-columns: 1fr;
@@ -1204,6 +1350,7 @@ button {
   }
 
   .metric-grid,
+  .dashboard-overview-grid,
   .listing-grid,
   .course-form,
   .resume-grid,
