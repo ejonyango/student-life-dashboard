@@ -292,7 +292,7 @@ button {
 
 .dashboard-command {
   display: grid;
-  grid-template-columns: minmax(360px, 1.3fr) repeat(3, minmax(220px, 0.75fr));
+  grid-template-columns: minmax(360px, 1.4fr) repeat(auto-fit, minmax(190px, 0.75fr));
   gap: 14px;
 }
 
@@ -376,9 +376,13 @@ button {
   border-left: 4px solid #e4002b;
 }
 
+.command-card.academic {
+  border-left: 4px solid #41b6e6;
+}
+
 .dashboard-overview-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 14px;
 }
 
@@ -421,6 +425,40 @@ button {
 
 .mini-list em {
   font-style: normal;
+}
+
+.academic-snapshot {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.academic-snapshot.wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.academic-snapshot div {
+  padding: 12px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.academic-snapshot span {
+  display: block;
+  color: #587083;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.academic-snapshot strong {
+  display: block;
+  margin-top: 5px;
+  color: #0b2f47;
+  font-size: 1.5rem;
 }
 
 .two-column,

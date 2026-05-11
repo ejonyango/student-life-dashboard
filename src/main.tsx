@@ -113,6 +113,13 @@ type AcademicPlanTerm = {
   courses: string[];
 };
 
+type CompletedCourse = {
+  code: string;
+  title: string;
+  source: "Resume" | "Navigate360";
+  area: string;
+};
+
 type NavigateTask = {
   title: string;
   type: "Event" | "To-Do" | "Notification" | "Status";
@@ -332,6 +339,39 @@ const initialCourses: Lesson[] = [
     location: "Corboy Law Center L08"
   }
 ];
+
+const academicStanding = {
+  gpaLabel: "Major GPA",
+  gpa: "4.0/4.0",
+  classYear: "Class of 2028",
+  honors: ["Dean's List: Fall 2024", "Dean's List: Spring 2026"],
+  completedCourses: [
+    {
+      code: "ECON 303",
+      title: "Intermediate Microeconomics",
+      source: "Resume",
+      area: "Economics"
+    },
+    {
+      code: "ACCT 303",
+      title: "Intermediate Accounting I",
+      source: "Resume",
+      area: "Accounting"
+    },
+    {
+      code: "INFS 346",
+      title: "Database Systems",
+      source: "Resume",
+      area: "Information Systems"
+    },
+    {
+      code: "ISSCM 241",
+      title: "Business Statistics",
+      source: "Resume",
+      area: "Analytics"
+    }
+  ] satisfies CompletedCourse[]
+};
 
 const navigateAcademicPlan: AcademicPlanTerm[] = [
   {
@@ -758,6 +798,8 @@ function App() {
   const savedSignalCount = resumeProfile.skills.length + resumeProfile.experience.length + resumeProfile.keywords.length;
   const registeredCourseCount = courseList.length;
   const plannedCourseCount = navigateAcademicPlan.reduce((total, term) => total + term.courses.length, 0);
+  const completedCourseCount = academicStanding.completedCourses.length;
+  const totalKnownProgramCourses = completedCourseCount + plannedCourseCount;
   const coursesLeftAfterCurrentTerm = Math.max(0, plannedCourseCount - registeredCourseCount);
 
   useEffect(() => {
@@ -932,6 +974,7 @@ function App() {
               <span>{baselineResume.status} baseline</span>
               <span>{matchedListings.length} matched listings</span>
               <span>{highPriorityTasks.length} high-priority tasks</span>
+              <span>{academicStanding.gpaLabel} {academicStanding.gpa}</span>
             </div>
           </article>
 
@@ -952,9 +995,17 @@ function App() {
             <strong>{highPriorityTasks[0]?.title ?? "No urgent task"}</strong>
             <p>{highPriorityTasks[0]?.date ?? "All clear"}</p>
           </article>
+
+          <article className="command-card academic">
+            <span>Academic standing</span>
+            <strong>{academicStanding.gpaLabel} {academicStanding.gpa}</strong>
+            <p>{completedCourseCount} completed courses · {academicStanding.classYear}</p>
+          </article>
         </section>
 
         <section className={`metric-grid compact-metrics ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Student life metrics">
+          <Metric label={academicStanding.gpaLabel} value={academicStanding.gpa} detail={academicStanding.honors.join(" · ")} />
+          <Metric label="Courses completed" value={String(completedCourseCount)} detail="From resume/course history" />
           <Metric label="Resume skills" value={String(resumeProfile.skills.length)} detail="Saved from upload" />
           <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
           <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
@@ -968,7 +1019,7 @@ function App() {
           <Metric
             label="Courses left"
             value={String(coursesLeftAfterCurrentTerm)}
-            detail={`${plannedCourseCount} planned total`}
+            detail={`${totalKnownProgramCourses} known program courses`}
           />
         </section>
 
@@ -1006,6 +1057,39 @@ function App() {
                   <strong>{course.course}</strong>
                   <span>{course.time}</span>
                   <em>{course.location}</em>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="overview-panel academic-summary">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Academic record</p>
+                <h3>GPA and completed courses</h3>
+              </div>
+              <a className="text-link" href="#school">School page</a>
+            </div>
+            <div className="academic-snapshot">
+              <div>
+                <span>{academicStanding.gpaLabel}</span>
+                <strong>{academicStanding.gpa}</strong>
+              </div>
+              <div>
+                <span>Completed</span>
+                <strong>{completedCourseCount}</strong>
+              </div>
+              <div>
+                <span>Left after current term</span>
+                <strong>{coursesLeftAfterCurrentTerm}</strong>
+              </div>
+            </div>
+            <div className="mini-list">
+              {academicStanding.completedCourses.slice(0, 3).map((course) => (
+                <div key={`academic-${course.code}`}>
+                  <strong>{course.code}</strong>
+                  <span>{course.title}</span>
+                  <em>{course.area} · {course.source}</em>
                 </div>
               ))}
             </div>
@@ -1418,6 +1502,43 @@ function App() {
                   <span>{course.time}</span>
                   <span>{course.location}</span>
                   <em>{course.task}</em>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="completed-course-history">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Completed coursework</p>
+                <h4>GPA and prior course history</h4>
+              </div>
+              <span className="progress-pill">{academicStanding.gpaLabel} {academicStanding.gpa}</span>
+            </div>
+            <div className="academic-snapshot wide">
+              <div>
+                <span>Completed courses</span>
+                <strong>{completedCourseCount}</strong>
+              </div>
+              <div>
+                <span>Current registered</span>
+                <strong>{registeredCourseCount}</strong>
+              </div>
+              <div>
+                <span>Remaining after current term</span>
+                <strong>{coursesLeftAfterCurrentTerm}</strong>
+              </div>
+              <div>
+                <span>Known program courses</span>
+                <strong>{totalKnownProgramCourses}</strong>
+              </div>
+            </div>
+            <div className="schedule-table completed-table">
+              {academicStanding.completedCourses.map((course) => (
+                <article key={`completed-${course.code}`}>
+                  <strong>{course.code}</strong>
+                  <span>{course.title}</span>
+                  <span>{course.area}</span>
+                  <em>Source: {course.source}</em>
                 </article>
               ))}
             </div>
