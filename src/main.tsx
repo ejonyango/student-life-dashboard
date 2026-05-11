@@ -896,6 +896,105 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function syncCoursesFromDatabase() {
+      try {
+        const response = await fetch("http://localhost:8787/api/courses");
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        if (!isMounted || !Array.isArray(payload.courses) || payload.courses.length === 0) {
+          return;
+        }
+
+        setCourseList(payload.courses);
+      } catch {
+        // Local course data remains the fallback when Supabase is offline.
+      }
+    }
+
+    void syncCoursesFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncJobListingsFromDatabase() {
+      try {
+        const response = await fetch("http://localhost:8787/api/job-listings");
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        if (!isMounted || !Array.isArray(payload.listings) || payload.listings.length === 0) {
+          return;
+        }
+
+        setJobSearchState({
+          status: "success",
+          listings: payload.listings,
+          checkedAt: payload.checkedAt || new Date().toISOString(),
+          query: "Saved database listings",
+          providerStatus: [{
+            provider: "Supabase",
+            status: "ok",
+            message: "Loaded saved listings from database.",
+            count: payload.listings.length
+          }]
+        });
+      } catch {
+        // Local storage remains the listing fallback when Supabase is offline.
+      }
+    }
+
+    void syncJobListingsFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncResumeFromDatabase() {
+      try {
+        const response = await fetch("http://localhost:8787/api/resume-version");
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        const resumeVersion = payload.resumeVersion;
+        if (!isMounted || !resumeVersion) return;
+
+        const baseline = resumeVersion.baseline_resume || initialBaselineResume;
+        const profile: ResumeProfile = {
+          fileName: resumeVersion.file_name || defaultResumeProfile.fileName,
+          text: resumeVersion.raw_text || defaultResumeProfile.text,
+          skills: Array.isArray(resumeVersion.skills) ? resumeVersion.skills : defaultResumeProfile.skills,
+          experience: parseResume(resumeVersion.raw_text || "", resumeVersion.file_name || "", []).experience,
+          major: parseResume(resumeVersion.raw_text || "", resumeVersion.file_name || "", []).major,
+          keywords: Array.isArray(resumeVersion.keywords) ? resumeVersion.keywords : []
+        };
+
+        setResumeProfile(profile);
+        setBaselineResume({ ...initialBaselineResume, ...baseline });
+      } catch {
+        // Local storage remains the resume fallback when Supabase is offline.
+      }
+    }
+
+    void syncResumeFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem("student-life.applications", JSON.stringify(applicationList));
   }, [applicationList]);
 
@@ -912,13 +1011,13 @@ function App() {
       return;
     }
 
-    setCourseList((currentCourses) => [
-      ...currentCourses,
-      {
-        ...courseForm,
-        task: courseForm.task.trim() || "No assignment added yet"
-      }
-    ]);
+    const course = {
+      ...courseForm,
+      task: courseForm.task.trim() || "No assignment added yet"
+    };
+
+    setCourseList((currentCourses) => [...currentCourses, course]);
+    void persistCourse(course);
 
     setCourseForm({
       course: "",
@@ -928,6 +1027,20 @@ function App() {
       professor: "",
       location: ""
     });
+  }
+
+  async function persistCourse(course: Lesson) {
+    try {
+      await fetch("http://localhost:8787/api/courses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ course })
+      });
+    } catch {
+      // Local course data remains the fallback when the watcher/database is unavailable.
+    }
   }
 
   async function handleResumeUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -941,16 +1054,55 @@ function App() {
       ? await extractPdfText(file)
       : await file.text();
     const parsed = parseResume(text, file.name, resumeProfile.keywords);
+    const baseline = createBaselineResume(parsed);
     setResumeProfile(parsed);
-    setBaselineResume(createBaselineResume(parsed));
+    setBaselineResume(baseline);
+    void persistResumeVersion(parsed, baseline);
   }
 
   function saveKeywords() {
     const keywords = normalizeTerms(keywordInput);
-    setResumeProfile((currentProfile) => ({
-      ...currentProfile,
-      keywords
-    }));
+    setResumeProfile((currentProfile) => {
+      const updatedProfile = {
+        ...currentProfile,
+        keywords
+      };
+      void persistResumeVersion(updatedProfile, baselineResume);
+      return updatedProfile;
+    });
+  }
+
+  function approveBaselineResume() {
+    const approvedBaseline: BaselineResume = {
+      ...baselineResume,
+      status: "Approved",
+      updatedAt: "May 11, 2026"
+    };
+    setBaselineResume(approvedBaseline);
+    void persistResumeVersion(resumeProfile, approvedBaseline);
+  }
+
+  function regenerateBaselineResume() {
+    const draftBaseline = createBaselineResume(resumeProfile);
+    setBaselineResume(draftBaseline);
+    void persistResumeVersion(resumeProfile, draftBaseline);
+  }
+
+  async function persistResumeVersion(profile: ResumeProfile, baseline: BaselineResume) {
+    try {
+      await fetch("http://localhost:8787/api/resume-version", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          resumeProfile: profile,
+          baselineResume: baseline
+        })
+      });
+    } catch {
+      // Local storage remains the resume fallback when the watcher/database is unavailable.
+    }
   }
 
   async function runLiveJobSearch() {
@@ -1426,20 +1578,14 @@ function App() {
                 <button
                   className="primary-button"
                   type="button"
-                  onClick={() =>
-                    setBaselineResume((currentBaseline) => ({
-                      ...currentBaseline,
-                      status: "Approved",
-                      updatedAt: "May 11, 2026"
-                    }))
-                  }
+                  onClick={approveBaselineResume}
                 >
                   <CheckCircle2 size={16} /> Approve baseline
                 </button>
                 <button
                   className="ghost-button"
                   type="button"
-                  onClick={() => setBaselineResume(createBaselineResume(resumeProfile))}
+                  onClick={regenerateBaselineResume}
                 >
                   <Sparkles size={16} /> Regenerate draft
                 </button>

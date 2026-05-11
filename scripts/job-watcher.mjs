@@ -222,6 +222,265 @@ async function listApplicationRecords() {
   };
 }
 
+function listingExternalKey(listing) {
+  return [
+    listing.sourceBoard || "unknown",
+    listing.applicationLink || "",
+    listing.company || "",
+    listing.role || "",
+    listing.location || ""
+  ].join("|").toLowerCase();
+}
+
+async function saveJobListings(listings = []) {
+  const pool = getDbPool();
+  if (!pool || !Array.isArray(listings) || listings.length === 0) {
+    return { saved: 0 };
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+
+    for (const listing of listings) {
+      await client.query(
+        `
+          insert into public.job_listings (
+            external_key,
+            company,
+            role,
+            location,
+            source_board,
+            source_description,
+            application_link,
+            company_verification,
+            verified_at,
+            fit,
+            matched_terms,
+            raw_payload,
+            last_seen_at
+          )
+          values ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9, $10, $11::jsonb, now())
+          on conflict (external_key)
+          do update set
+            company = excluded.company,
+            role = excluded.role,
+            location = excluded.location,
+            source_board = excluded.source_board,
+            source_description = excluded.source_description,
+            application_link = excluded.application_link,
+            company_verification = excluded.company_verification,
+            fit = excluded.fit,
+            matched_terms = excluded.matched_terms,
+            raw_payload = excluded.raw_payload,
+            last_seen_at = now()
+        `,
+        [
+          listingExternalKey(listing),
+          listing.company || "Unknown company",
+          listing.role || "Internship",
+          listing.location || "",
+          listing.sourceBoard || "Unknown",
+          listing.sourceDescription || "",
+          listing.applicationLink || "",
+          listing.companyVerification || "",
+          Number(listing.fit || 0),
+          Array.isArray(listing.matchedTerms) ? listing.matchedTerms : [],
+          JSON.stringify(listing)
+        ]
+      );
+    }
+
+    await client.query("commit");
+    return { saved: listings.length };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function listJobListings() {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, database: false, listings: [], reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      select raw_payload, last_seen_at
+      from public.job_listings
+      order by last_seen_at desc
+      limit $1
+    `,
+    [MAX_RESULTS]
+  );
+
+  return {
+    ok: true,
+    database: true,
+    checkedAt: result.rows[0]?.last_seen_at || "",
+    listings: result.rows.map((row) => row.raw_payload).filter(Boolean)
+  };
+}
+
+async function saveResumeVersion(profile, baselineResume) {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, saved: false, reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.resume_versions (
+        student_id,
+        file_name,
+        raw_text,
+        baseline_resume,
+        skills,
+        keywords,
+        status,
+        approved_at
+      )
+      values (
+        (select id from student),
+        $1,
+        $2,
+        $3::jsonb,
+        $4,
+        $5,
+        $6,
+        case when $6 = 'approved' then now() else null end
+      )
+      returning id, file_name, raw_text, baseline_resume, skills, keywords, status, created_at, approved_at
+    `,
+    [
+      profile.fileName || "Resume",
+      profile.text || "",
+      JSON.stringify(baselineResume || {}),
+      Array.isArray(profile.skills) ? profile.skills : [],
+      Array.isArray(profile.keywords) ? profile.keywords : [],
+      String(baselineResume?.status || "draft").toLowerCase()
+    ]
+  );
+
+  return { ok: true, saved: true, resumeVersion: result.rows[0] };
+}
+
+async function loadLatestResumeVersion() {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, database: false, resumeVersion: null, reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      select resume_versions.*
+      from public.resume_versions
+      join public.student_profiles on student_profiles.id = resume_versions.student_id
+      where student_profiles.slug = 'eric-onyango'
+      order by resume_versions.created_at desc
+      limit 1
+    `
+  );
+
+  return { ok: true, database: true, resumeVersion: result.rows[0] || null };
+}
+
+async function handleResumeVersion(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, await loadLatestResumeVersion());
+    return;
+  }
+
+  const body = await readBody(request);
+  sendJson(response, 200, await saveResumeVersion(body.resumeProfile || {}, body.baselineResume || {}));
+}
+
+function mapCourseRow(row) {
+  return {
+    id: row.id,
+    course: row.course_name,
+    time: row.meeting_pattern || "",
+    task: row.raw_payload?.task || "No assignment added yet",
+    intensity: row.raw_payload?.intensity || "Medium",
+    professor: row.instructor || "",
+    location: row.location || ""
+  };
+}
+
+async function listCourseRecords() {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, database: false, courses: [], reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      select course_records.*
+      from public.course_records
+      join public.student_profiles on student_profiles.id = course_records.student_id
+      where student_profiles.slug = 'eric-onyango'
+        and course_records.status in ('registered', 'planned')
+      order by course_records.created_at asc
+    `
+  );
+
+  return { ok: true, database: true, courses: result.rows.map(mapCourseRow) };
+}
+
+async function saveCourseRecord(course) {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, saved: false, reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.course_records (
+        student_id,
+        source,
+        course_name,
+        status,
+        instructor,
+        meeting_pattern,
+        location,
+        raw_payload,
+        updated_at
+      )
+      values ((select id from student), 'manual', $1, 'registered', $2, $3, $4, $5::jsonb, now())
+      returning id, course_name, instructor, meeting_pattern, location, raw_payload, created_at, updated_at
+    `,
+    [
+      course.course || "Untitled course",
+      course.professor || "",
+      course.time || "",
+      course.location || "",
+      JSON.stringify(course)
+    ]
+  );
+
+  return { ok: true, saved: true, course: mapCourseRow(result.rows[0]) };
+}
+
+async function handleCourses(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, await listCourseRecords());
+    return;
+  }
+
+  const body = await readBody(request);
+  sendJson(response, 200, await saveCourseRecord(body.course || body));
+}
+
 async function saveApplicationPacketRecord(client, studentId, application) {
   if (!application.packet) return null;
 
@@ -698,11 +957,20 @@ async function handleJobSearch(request, response) {
   const listings = dedupe(providerResults.flatMap((result) => result.listings))
     .filter(isStudentAppropriateListing)
     .slice(0, MAX_RESULTS);
+  let databaseSaved = 0;
+
+  try {
+    const saveResult = await saveJobListings(listings);
+    databaseSaved = saveResult.saved;
+  } catch {
+    databaseSaved = 0;
+  }
 
   sendJson(response, 200, {
     checkedAt: new Date().toISOString(),
     query: search.query,
     listings,
+    databaseSaved,
     providerStatus: providerResults.map((result) => ({
       provider: result.provider,
       status: result.status,
@@ -921,8 +1189,23 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/job-listings" && request.method === "GET") {
+      sendJson(response, 200, await listJobListings());
+      return;
+    }
+
     if (url.pathname === "/api/application-packet" && request.method === "POST") {
       await handleApplicationPacket(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/resume-version" && (request.method === "GET" || request.method === "POST")) {
+      await handleResumeVersion(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/courses" && (request.method === "GET" || request.method === "POST")) {
+      await handleCourses(request, response);
       return;
     }
 
