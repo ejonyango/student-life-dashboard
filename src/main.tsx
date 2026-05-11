@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
@@ -800,6 +800,7 @@ function getPageFromHash(): Page {
 }
 
 function App() {
+  const applicationPacketRef = useRef<HTMLDivElement | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>(() => getPageFromHash());
   const [courseList, setCourseList] = useState<Lesson[]>(initialCourses);
   const [courseForm, setCourseForm] = useState<Lesson>({
@@ -857,6 +858,12 @@ function App() {
       window.localStorage.setItem("student-life.job-search", JSON.stringify(jobSearchState));
     }
   }, [jobSearchState]);
+
+  useEffect(() => {
+    if (applicationPacket && currentPage === "available-listings") {
+      applicationPacketRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [applicationPacket, currentPage]);
 
   function addCourse(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1379,38 +1386,8 @@ function App() {
               <p className="watcher-error">Add keys to a local .env or shell environment, then run npm run job-watcher.</p>
             ) : null}
           </div>
-          <div className="listing-grid">
-            {matchedListings.map((listing) => (
-              <article className="listing-card" key={`${listing.company}-${listing.role}`}>
-                <div className="listing-topline">
-                  <span>{listing.sourceBoard}</span>
-                  <strong>{listing.fit}% match</strong>
-                </div>
-                <h4>{listing.role}</h4>
-                <p className="listing-company">
-                  {listing.company} · {listing.location}
-                </p>
-                <p>{listing.sourceDescription}</p>
-                <p className="tailoring-note">
-                  AI will tailor Eric’s approved baseline resume toward {listing.role} before application submission.
-                </p>
-                <div className="verified-line">
-                  <ShieldCheck size={16} />
-                  <span>{listing.companyVerification} · {listing.verifiedDate}</span>
-                </div>
-                <div className="match-tags">
-                  {listing.matchedTerms.slice(0, 6).map((term) => (
-                    <span key={`${listing.company}-${term}`}>{term}</span>
-                  ))}
-                </div>
-                <button className="application-link" type="button" onClick={() => prepareApplication(listing)}>
-                  Prepare application <Sparkles size={16} />
-                </button>
-              </article>
-            ))}
-          </div>
           {applicationPacket ? (
-            <div className="application-packet" id="application-packet">
+            <div className="application-packet" id="application-packet" ref={applicationPacketRef}>
               <div className="panel-header">
                 <div>
                   <p className="eyebrow">Application packet</p>
@@ -1471,6 +1448,36 @@ function App() {
               </div>
             </div>
           ) : null}
+          <div className="listing-grid">
+            {matchedListings.map((listing) => (
+              <article className="listing-card" key={`${listing.company}-${listing.role}`}>
+                <div className="listing-topline">
+                  <span>{listing.sourceBoard}</span>
+                  <strong>{listing.fit}% match</strong>
+                </div>
+                <h4>{listing.role}</h4>
+                <p className="listing-company">
+                  {listing.company} · {listing.location}
+                </p>
+                <p>{listing.sourceDescription}</p>
+                <p className="tailoring-note">
+                  AI will tailor Eric’s approved baseline resume toward {listing.role} before application submission.
+                </p>
+                <div className="verified-line">
+                  <ShieldCheck size={16} />
+                  <span>{listing.companyVerification} · {listing.verifiedDate}</span>
+                </div>
+                <div className="match-tags">
+                  {listing.matchedTerms.slice(0, 6).map((term) => (
+                    <span key={`${listing.company}-${term}`}>{term}</span>
+                  ))}
+                </div>
+                <button className="application-link" type="button" onClick={() => prepareApplication(listing)}>
+                  Prepare application <Sparkles size={16} />
+                </button>
+              </article>
+            ))}
+          </div>
           {matchedListings.length === 0 ? (
             <div className="empty-state">
               <strong>No listings matched yet.</strong>
