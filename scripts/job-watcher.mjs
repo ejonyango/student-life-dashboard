@@ -16,8 +16,7 @@ const MAX_RESULTS = 500;
 
 const providerConfig = {
   theirStack: process.env.THEIRSTACK_API_KEY || "",
-  serpApi: process.env.SERPAPI_API_KEY || "",
-  jobdata: process.env.JOBDATA_API_KEY || ""
+  serpApi: process.env.SERPAPI_API_KEY || ""
 };
 
 function sendJson(response, status, payload) {
@@ -66,7 +65,6 @@ function compact(value, fallback = "Unknown") {
 function sourceBoard(provider) {
   if (provider === "theirstack") return "TheirStack";
   if (provider === "serpapi") return "SerpApi";
-  if (provider === "jobdata") return "JobdataAPI";
   return "Company Careers";
 }
 
@@ -232,36 +230,6 @@ async function fetchSerpApi(search) {
   };
 }
 
-async function fetchJobdata(search) {
-  if (!providerConfig.jobdata) {
-    return { provider: "JobdataAPI", status: "missing_key", message: "Set JOBDATA_API_KEY to enable JobdataAPI.", listings: [] };
-  }
-
-  const params = new URLSearchParams({
-    title: search.query,
-    location: "Chicago",
-    max_age: "30"
-  });
-  const response = await fetch(`https://jobdataapi.com/api/jobs/?${params.toString()}`, {
-    headers: {
-      Authorization: `Api-Key ${providerConfig.jobdata}`
-    }
-  });
-
-  if (!response.ok) {
-    return { provider: "JobdataAPI", status: "error", message: await providerError(response, "JobdataAPI"), listings: [] };
-  }
-
-  const payload = await response.json();
-  const jobs = payload.results || payload.data || payload.jobs || [];
-  return {
-    provider: "JobdataAPI",
-    status: "ok",
-    message: `${jobs.length} jobs returned.`,
-    listings: jobs.map((job) => normalizeListing(job, "jobdata"))
-  };
-}
-
 function buildSearch(body) {
   const terms = [
     ...(body.skills || []),
@@ -305,14 +273,13 @@ async function handleJobSearch(request, response) {
   const search = buildSearch(body);
   const settled = await Promise.allSettled([
     fetchTheirStack(search),
-    fetchSerpApi(search),
-    fetchJobdata(search)
+    fetchSerpApi(search)
   ]);
 
   const providerResults = settled.map((result, index) => {
     if (result.status === "fulfilled") return result.value;
     return {
-      provider: ["TheirStack", "SerpApi", "JobdataAPI"][index],
+      provider: ["TheirStack", "SerpApi"][index],
       status: "error",
       message: result.reason?.message || "Provider request failed.",
       listings: []
@@ -347,8 +314,7 @@ const server = createServer(async (request, response) => {
         ok: true,
         providers: {
           theirStack: Boolean(providerConfig.theirStack),
-          serpApi: Boolean(providerConfig.serpApi),
-          jobdata: Boolean(providerConfig.jobdata)
+          serpApi: Boolean(providerConfig.serpApi)
         }
       });
       return;
