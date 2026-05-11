@@ -1976,15 +1976,21 @@ function App() {
         <section className={`dashboard-command ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Eric dashboard command center">
           <article className="command-primary">
             <p className="eyebrow">Today’s focus</p>
-            <h3>Keep finance recruiting, Fall registration, and Navigate360 tasks moving together.</h3>
+            <h3>
+              {upcomingAssignments[0]
+                ? `Finish the next calendar item: ${upcomingAssignments[0].title}.`
+                : "Keep finance recruiting, Fall registration, and Navigate360 tasks moving together."}
+            </h3>
             <p>
-              Best next move: schedule Career Services and Academic Advisor appointments, then use the
-              approved baseline resume to prepare applications for the strongest finance matches.
+              {upcomingAssignments[0]
+                ? `${upcomingAssignments[0].courseName} is due ${formatAssignmentDue(upcomingAssignments[0])}. ${formatAssignmentReading(upcomingAssignments[0], courseList) || "Use the Advisor to turn the assignment into a timed action plan."}`
+                : "Best next move: schedule Career Services and Academic Advisor appointments, then use the approved baseline resume to prepare applications for the strongest finance matches."}
             </p>
             <div className="command-strip">
               <span>{baselineResume.status} baseline</span>
               <span>{matchedListings.length} matched listings</span>
               <span>{highPriorityTasks.length} high-priority tasks</span>
+              <span>{upcomingAssignments.length} calendar due</span>
               <span>{academicStanding.gpaLabel} {academicStanding.gpa}</span>
             </div>
           </article>
@@ -2046,6 +2052,38 @@ function App() {
         </section>
 
         <section className={`dashboard-overview-grid ${currentPage === "dashboard" ? "" : "hidden-page"}`}>
+          <article className="overview-panel calendar-summary">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Calendar</p>
+                <h3>Upcoming due dates</h3>
+              </div>
+              <a className="text-link" href="#calendar">Open calendar</a>
+            </div>
+            <div className="dashboard-due-list">
+              {upcomingAssignments.slice(0, 5).map((assignment) => (
+                <article className="dashboard-due-row" key={`dashboard-due-${assignment.id || assignment.courseName}-${assignment.title}`}>
+                  <div className="due-date-block">
+                    <strong>{formatAssignmentDueDay(assignment)}</strong>
+                    <span>{formatAssignmentDueTime(assignment)}</span>
+                  </div>
+                  <div>
+                    <strong>{assignment.title}</strong>
+                    <span>{assignment.courseName}</span>
+                    {formatAssignmentReading(assignment, courseList) ? <em>{formatAssignmentReading(assignment, courseList)}</em> : null}
+                  </div>
+                  <span className={`due-chip ${assignment.priority}`}>{assignment.priority}</span>
+                </article>
+              ))}
+            </div>
+            {upcomingAssignments.length === 0 ? (
+              <div className="empty-state">
+                <strong>No calendar due dates yet.</strong>
+                <span>Add due items in Calendar or Assignment check-in and they will appear here.</span>
+              </div>
+            ) : null}
+          </article>
+
           <article className="overview-panel">
             <div className="panel-header">
               <div>
@@ -3601,6 +3639,18 @@ function formatAssignmentDue(assignment: AssignmentTask) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function formatAssignmentDueDay(assignment: AssignmentTask) {
+  const dueDate = parseAssignmentDueDate(assignment);
+  if (!dueDate) return "TBD";
+  return dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatAssignmentDueTime(assignment: AssignmentTask) {
+  const dueDate = parseAssignmentDueDate(assignment);
+  if (!dueDate) return "";
+  return dueDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function getCourseTextbook(courseName: string, courses: Lesson[]) {

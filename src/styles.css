@@ -395,6 +395,66 @@ button {
   padding: 18px;
 }
 
+.calendar-summary {
+  grid-column: span 2;
+  border-top: 4px solid #e4002b;
+}
+
+.dashboard-due-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-due-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.dashboard-due-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dashboard-due-row strong,
+.dashboard-due-row span,
+.dashboard-due-row em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-due-row span,
+.dashboard-due-row em {
+  color: #5e7180;
+  font-size: 0.88rem;
+  font-style: normal;
+}
+
+.due-date-block {
+  padding: 8px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.due-date-block strong {
+  color: #0b2f47;
+}
+
+.due-date-block span {
+  color: #0b75a5;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .text-link {
   color: #0b75a5;
   font-size: 0.9rem;
@@ -1851,6 +1911,10 @@ button.application-link {
     overflow-x: auto;
   }
 
+  .calendar-summary {
+    grid-column: span 1;
+  }
+
   .schedule-table article {
     grid-template-columns: 1fr 1fr;
   }
@@ -1935,6 +1999,14 @@ button.application-link {
 
   .calendar-board {
     overflow-x: auto;
+  }
+
+  .dashboard-due-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-due-row .due-chip {
+    width: fit-content;
   }
 
   .schedule-table article {
