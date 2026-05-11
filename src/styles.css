@@ -511,6 +511,7 @@ button {
 
 .application-row strong,
 .application-row span,
+.application-row em,
 .lesson-row strong,
 .lesson-row span,
 .agent-row strong,
@@ -523,11 +524,17 @@ button {
 }
 
 .application-row span,
+.application-row em,
 .lesson-row span,
 .agent-row span,
 .resume-card span {
   color: #5e7180;
   font-size: 0.9rem;
+}
+
+.application-row em {
+  margin-top: 4px;
+  font-style: normal;
 }
 
 .status {
@@ -932,6 +939,18 @@ button {
   gap: 8px;
 }
 
+button.application-link {
+  width: 100%;
+  padding: 0;
+  color: #0b75a5;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
 .listing-topline {
   justify-content: space-between;
 }
@@ -967,6 +986,77 @@ button {
 
 .listing-company {
   font-weight: 800;
+}
+
+.application-packet {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #d8edf5;
+  border-left: 4px solid #41b6e6;
+  border-radius: 8px;
+}
+
+.application-packet .panel-header span {
+  display: block;
+  color: #5e7180;
+}
+
+.packet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.packet-grid article,
+.cover-note {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.packet-grid strong,
+.cover-note strong {
+  color: #0b2f47;
+}
+
+.packet-grid span,
+.packet-grid li,
+.cover-note p {
+  color: #5e7180;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.packet-grid ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.cover-note p {
+  margin: 0;
+}
+
+.packet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.packet-actions .application-link.secondary {
+  min-height: 40px;
+  padding: 0 12px;
+  color: #0b75a5;
+  background: #e6f7fd;
+  border-radius: 8px;
+  text-decoration: none;
 }
 
 .class-integration {
@@ -1196,6 +1286,15 @@ button {
   border-radius: 8px;
 }
 
+button.application-link {
+  width: fit-content;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  border: 0;
+  cursor: pointer;
+}
+
 .course-form {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1388,6 +1487,7 @@ button {
 
   .metric-grid,
   .listing-grid,
+  .packet-grid,
   .resume-grid,
   .integration-grid,
   .plan-grid,
@@ -1462,6 +1562,7 @@ button {
   .metric-grid,
   .dashboard-overview-grid,
   .listing-grid,
+  .packet-grid,
   .course-form,
   .resume-grid,
   .integration-grid,

@@ -38,6 +38,9 @@ type Application = {
   status: "Applied" | "Interview" | "Drafting" | "Follow-up" | "Offer prep";
   next: string;
   fit: number;
+  source?: string;
+  applicationLink?: string;
+  resumeVersion?: string;
 };
 
 type Lesson = {
@@ -153,6 +156,14 @@ type JobSearchState = {
   query: string;
   providerStatus: ProviderStatus[];
   error?: string;
+};
+
+type ApplicationPacket = {
+  listing: MatchedListing;
+  resumeFocus: string[];
+  coverNote: string;
+  talkingPoints: string[];
+  commonAnswers: string[];
 };
 
 type Page =
@@ -280,7 +291,7 @@ const initialBaselineResume: BaselineResume = {
   skills: ["Excel", "PowerPoint", "SQL", "Refinitiv Eikon", "Grata", "Valuation", "Financial Modeling", "Capital Markets"]
 };
 
-const applications: Application[] = [
+const initialApplications: Application[] = [
   {
     company: "Exelon",
     role: "Finance Intern - Treasury and Capital Markets",
@@ -804,6 +815,8 @@ function App() {
   const [keywordInput, setKeywordInput] = useState("Chicago, internship");
   const [navigateText, setNavigateText] = useState("");
   const [navigateItems, setNavigateItems] = useState<NavigateItem[]>([]);
+  const [applicationList, setApplicationList] = useState<Application[]>(initialApplications);
+  const [applicationPacket, setApplicationPacket] = useState<ApplicationPacket | null>(null);
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>({
     status: "idle",
     listings: [],
@@ -933,6 +946,61 @@ function App() {
 
   function importNavigateText() {
     setNavigateItems(parseNavigate360Text(navigateText));
+  }
+
+  function prepareApplication(listing: MatchedListing) {
+    setApplicationPacket(createApplicationPacket(listing, baselineResume));
+  }
+
+  function upsertApplication(application: Application) {
+    setApplicationList((currentApplications) => {
+      const existingIndex = currentApplications.findIndex(
+        (currentApplication) =>
+          currentApplication.company === application.company && currentApplication.role === application.role
+      );
+
+      if (existingIndex === -1) {
+        return [application, ...currentApplications];
+      }
+
+      return currentApplications.map((currentApplication, index) =>
+        index === existingIndex ? { ...currentApplication, ...application } : currentApplication
+      );
+    });
+  }
+
+  function saveApplicationDraft() {
+    if (!applicationPacket) return;
+
+    upsertApplication({
+      company: applicationPacket.listing.company,
+      role: applicationPacket.listing.role,
+      status: "Drafting",
+      next: "Review tailored packet, verify application link, then decide whether to apply.",
+      fit: applicationPacket.listing.fit,
+      source: applicationPacket.listing.sourceBoard,
+      applicationLink: applicationPacket.listing.applicationLink,
+      resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`
+    });
+    setCurrentPage("applications");
+    window.location.hash = "applications";
+  }
+
+  function markApplicationApplied() {
+    if (!applicationPacket) return;
+
+    upsertApplication({
+      company: applicationPacket.listing.company,
+      role: applicationPacket.listing.role,
+      status: "Applied",
+      next: "Create a 7-day follow-up reminder and watch email for recruiter replies.",
+      fit: applicationPacket.listing.fit,
+      source: applicationPacket.listing.sourceBoard,
+      applicationLink: applicationPacket.listing.applicationLink,
+      resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`
+    });
+    setCurrentPage("applications");
+    window.location.hash = "applications";
   }
 
   return (
@@ -1095,7 +1163,7 @@ function App() {
               <a className="text-link" href="#available-listings">Available listings</a>
             </div>
             <div className="mini-list">
-              {applications.slice(0, 3).map((application) => (
+              {applicationList.slice(0, 3).map((application) => (
                 <div key={`overview-${application.company}`}>
                   <strong>{application.company}</strong>
                   <span>{application.role}</span>
@@ -1335,12 +1403,74 @@ function App() {
                     <span key={`${listing.company}-${term}`}>{term}</span>
                   ))}
                 </div>
-                <a className="application-link" href={listing.applicationLink} target="_blank" rel="noreferrer">
-                  Prepare application <ExternalLink size={16} />
-                </a>
+                <button className="application-link" type="button" onClick={() => prepareApplication(listing)}>
+                  Prepare application <Sparkles size={16} />
+                </button>
               </article>
             ))}
           </div>
+          {applicationPacket ? (
+            <div className="application-packet" id="application-packet">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Application packet</p>
+                  <h3>{applicationPacket.listing.role}</h3>
+                  <span>{applicationPacket.listing.company} · {applicationPacket.listing.location}</span>
+                </div>
+                <span className="progress-pill">{applicationPacket.listing.fit}% match</span>
+              </div>
+              <div className="packet-grid">
+                <article>
+                  <strong>Verification</strong>
+                  <span>{applicationPacket.listing.companyVerification}</span>
+                  <span>Source: {applicationPacket.listing.sourceBoard}</span>
+                  <span>Checked: {applicationPacket.listing.verifiedDate}</span>
+                </article>
+                <article>
+                  <strong>Resume tailoring focus</strong>
+                  <ul>
+                    {applicationPacket.resumeFocus.map((item) => (
+                      <li key={`focus-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+                <article>
+                  <strong>Talking points</strong>
+                  <ul>
+                    {applicationPacket.talkingPoints.map((item) => (
+                      <li key={`talk-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+                <article>
+                  <strong>Common application answers</strong>
+                  <ul>
+                    {applicationPacket.commonAnswers.map((item) => (
+                      <li key={`answer-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              </div>
+              <div className="cover-note">
+                <strong>Draft cover note</strong>
+                <p>{applicationPacket.coverNote}</p>
+              </div>
+              <div className="packet-actions">
+                <button className="primary-button" type="button" onClick={saveApplicationDraft}>
+                  <Save size={16} /> Save draft
+                </button>
+                <button className="ghost-button" type="button" onClick={markApplicationApplied}>
+                  <CheckCircle2 size={16} /> Mark applied
+                </button>
+                <a className="application-link secondary" href={applicationPacket.listing.applicationLink} target="_blank" rel="noreferrer">
+                  Open application <ExternalLink size={16} />
+                </a>
+                <button className="ghost-button" type="button" onClick={() => setApplicationPacket(null)}>
+                  Close packet
+                </button>
+              </div>
+            </div>
+          ) : null}
           {matchedListings.length === 0 ? (
             <div className="empty-state">
               <strong>No listings matched yet.</strong>
@@ -1358,11 +1488,12 @@ function App() {
             <button className="ghost-button">New application</button>
           </div>
           <div className="application-list">
-            {applications.map((application) => (
+            {applicationList.map((application) => (
               <article className="application-row" key={`${application.company}-${application.role}`}>
                 <div>
                   <strong>{application.company}</strong>
                   <span>{application.role}</span>
+                  {application.source ? <em>{application.source} · {application.resumeVersion}</em> : null}
                 </div>
                 <span className={`status ${statusClass[application.status]}`}>
                   {application.status}
@@ -1871,6 +2002,32 @@ function getMatchedListings(profile: ResumeProfile, sourceListings: Listing[] = 
     .filter((listing) => listing.matchCount >= 2)
     .sort((a, b) => b.matchCount - a.matchCount || b.fit - a.fit)
     .slice(0, 500);
+}
+
+function createApplicationPacket(listing: MatchedListing, baseline: BaselineResume): ApplicationPacket {
+  const matchedTerms = listing.matchedTerms.slice(0, 5);
+  const resumeFocus = matchedTerms.length > 0
+    ? matchedTerms.map((term) => `Emphasize ${term} in the role summary and bullets.`)
+    : ["Emphasize finance analysis, Excel, communication, and investment research experience."];
+  const strongestExperience = baseline.experience.slice(0, 3).map((experience) => experience.role);
+  const talkingPoints = [
+    `${baseline.name}'s ${baseline.education[0]} aligns with ${listing.role}.`,
+    `Connect ${strongestExperience.join(", ")} to ${listing.company}'s internship needs.`,
+    `Use the ${listing.fit}% match score to explain why this role belongs in the priority pipeline.`
+  ];
+  const commonAnswers = [
+    `Why this company: reference ${listing.company}'s role description and Eric's finance, markets, and analytical background.`,
+    "Availability: confirm semester workload, interview windows, and start-date flexibility before submission.",
+    "Work authorization: answer only with Eric's reviewed and approved wording."
+  ];
+
+  return {
+    listing,
+    resumeFocus,
+    talkingPoints,
+    commonAnswers,
+    coverNote: `I am interested in the ${listing.role} opportunity at ${listing.company}. My finance coursework, investment research work, and experience with ${matchedTerms.slice(0, 3).join(", ") || "financial analysis"} position me to contribute quickly while continuing to grow through a rigorous internship experience.`
+  };
 }
 
 function formatCheckedAt(value: string) {
