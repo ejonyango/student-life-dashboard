@@ -822,7 +822,7 @@ function App() {
   const [keywordInput, setKeywordInput] = useState("Chicago, internship");
   const [navigateText, setNavigateText] = useState("");
   const [navigateItems, setNavigateItems] = useState<NavigateItem[]>([]);
-  const [applicationList, setApplicationList] = useState<Application[]>(initialApplications);
+  const [applicationList, setApplicationList] = useState<Application[]>(() => loadApplicationList());
   const [applicationPacket, setApplicationPacket] = useState<ApplicationPacket | null>(null);
   const [packetStatus, setPacketStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
@@ -865,6 +865,10 @@ function App() {
       window.localStorage.setItem("student-life.job-search", JSON.stringify(jobSearchState));
     }
   }, [jobSearchState]);
+
+  useEffect(() => {
+    window.localStorage.setItem("student-life.applications", JSON.stringify(applicationList));
+  }, [applicationList]);
 
   useEffect(() => {
     if (applicationPacket && currentPage === "available-listings") {
@@ -1058,6 +1062,18 @@ function App() {
     });
     setCurrentPage("applications");
     window.location.hash = "applications";
+  }
+
+  function openApplicationUrl() {
+    const rawUrl = applicationPacket?.listing.applicationLink?.trim();
+    if (!rawUrl) return;
+
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+    if (!openedWindow) {
+      window.location.href = url;
+    }
   }
 
   return (
@@ -1515,9 +1531,14 @@ function App() {
                   <button className="ghost-button" type="button" onClick={markApplicationApplied}>
                     <CheckCircle2 size={16} /> Mark applied
                   </button>
-                  <a className="application-link secondary" href={applicationPacket.listing.applicationLink} target="_blank" rel="noreferrer">
+                  <button
+                    className="application-link secondary"
+                    type="button"
+                    onClick={openApplicationUrl}
+                    disabled={!applicationPacket.listing.applicationLink}
+                  >
                     Open application <ExternalLink size={16} />
-                  </a>
+                  </button>
                   <button className="ghost-button" type="button" onClick={() => setApplicationPacket(null)}>
                     Close packet
                   </button>
@@ -2006,6 +2027,20 @@ function loadJobSearchState(): JobSearchState {
     };
   } catch {
     return emptyState;
+  }
+}
+
+function loadApplicationList(): Application[] {
+  try {
+    const storedApplications = window.localStorage.getItem("student-life.applications");
+    if (!storedApplications) {
+      return initialApplications;
+    }
+
+    const parsedApplications = JSON.parse(storedApplications);
+    return Array.isArray(parsedApplications) ? parsedApplications : initialApplications;
+  } catch {
+    return initialApplications;
   }
 }
 
