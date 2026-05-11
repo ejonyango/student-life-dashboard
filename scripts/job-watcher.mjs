@@ -203,21 +203,27 @@ async function fetchSerpApi(search) {
     return { provider: "SerpApi", status: "missing_key", message: "Set SERPAPI_API_KEY to enable Google Jobs discovery.", listings: [] };
   }
 
-  const params = new URLSearchParams({
-    engine: "google_jobs",
-    q: search.query,
-    location: "Chicago, Illinois, United States",
-    hl: "en",
-    api_key: providerConfig.serpApi
-  });
-  const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+  const responses = await Promise.all(
+    search.serpQueries.map(async (query) => {
+      const params = new URLSearchParams({
+        engine: "google_jobs",
+        q: query,
+        location: "Chicago, Illinois, United States",
+        hl: "en",
+        api_key: providerConfig.serpApi
+      });
+      const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
 
-  if (!response.ok) {
-    return { provider: "SerpApi", status: "error", message: await providerError(response, "SerpApi"), listings: [] };
-  }
+      if (!response.ok) {
+        throw new Error(await providerError(response, "SerpApi"));
+      }
 
-  const payload = await response.json();
-  const jobs = payload.jobs_results || [];
+      const payload = await response.json();
+      return payload.jobs_results || [];
+    })
+  );
+  const jobs = responses.flat();
+
   return {
     provider: "SerpApi",
     status: "ok",
@@ -276,6 +282,12 @@ function buildSearch(body) {
 
   return {
     query: priorityTerms.slice(0, 6).join(" "),
+    serpQueries: [
+      "finance intern Chicago",
+      "investment banking summer analyst Chicago",
+      "capital markets intern Chicago",
+      "treasury intern Chicago"
+    ],
     titles: [
       "finance intern",
       "investment banking intern",
