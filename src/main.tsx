@@ -1473,8 +1473,8 @@ function App() {
 
           <article className="command-card">
             <span>Next class signal</span>
-            <strong>{nextClass.course}</strong>
-            <p>{nextClass.time} · {nextClass.location}</p>
+            <strong>{nextClass ? nextClass.course : "No course saved"}</strong>
+            <p>{nextClass ? `${nextClass.time} · ${nextClass.location || "Location TBD"}` : "Add Eric’s registered courses in School."}</p>
           </article>
 
           <article className="command-card alert">
