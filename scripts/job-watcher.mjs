@@ -514,6 +514,157 @@ async function handleCourses(request, response) {
   sendJson(response, 200, await saveCourseRecord(body.course || body));
 }
 
+function mapAssignmentRow(row) {
+  return {
+    id: row.id,
+    courseName: row.course_name,
+    title: row.title,
+    dueAt: row.due_at,
+    details: row.details || "",
+    status: row.status,
+    priority: row.priority,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+async function listAssignments() {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, database: false, assignments: [], reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      select assignment_tasks.*
+      from public.assignment_tasks
+      join public.student_profiles on student_profiles.id = assignment_tasks.student_id
+      where student_profiles.slug = 'eric-onyango'
+        and assignment_tasks.status != 'archived'
+      order by assignment_tasks.due_at nulls last, assignment_tasks.created_at desc
+    `
+  );
+
+  return { ok: true, database: true, assignments: result.rows.map(mapAssignmentRow) };
+}
+
+async function saveAssignment(assignment) {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, saved: false, reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.assignment_tasks (
+        student_id,
+        course_name,
+        title,
+        due_at,
+        details,
+        status,
+        priority,
+        updated_at
+      )
+      values ((select id from student), $1, $2, nullif($3, '')::timestamptz, $4, $5, $6, now())
+      returning *
+    `,
+    [
+      assignment.courseName || assignment.course || "General",
+      assignment.title || "Untitled assignment",
+      assignment.dueAt || "",
+      assignment.details || "",
+      assignment.status || "open",
+      assignment.priority || "medium"
+    ]
+  );
+
+  return { ok: true, saved: true, assignment: mapAssignmentRow(result.rows[0]) };
+}
+
+async function handleAssignments(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, await listAssignments());
+    return;
+  }
+
+  const body = await readBody(request);
+  sendJson(response, 200, await saveAssignment(body.assignment || body));
+}
+
+function mapClassNoteRow(row) {
+  return {
+    id: row.id,
+    courseName: row.course_name,
+    title: row.title,
+    noteType: row.note_type,
+    content: row.content,
+    tags: row.tags || [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+async function listClassNotes() {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, database: false, notes: [], reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      select class_notes.*
+      from public.class_notes
+      join public.student_profiles on student_profiles.id = class_notes.student_id
+      where student_profiles.slug = 'eric-onyango'
+      order by class_notes.created_at desc
+      limit 100
+    `
+  );
+
+  return { ok: true, database: true, notes: result.rows.map(mapClassNoteRow) };
+}
+
+async function saveClassNote(note) {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, saved: false, reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.class_notes (
+        student_id,
+        course_name,
+        title,
+        note_type,
+        content,
+        tags,
+        updated_at
+      )
+      values ((select id from student), $1, $2, $3, $4, $5, now())
+      returning *
+    `,
+    [
+      note.courseName || note.course || "General",
+      note.title || "Untitled note",
+      note.noteType || "notes",
+      note.content || "",
+      Array.isArray(note.tags) ? note.tags : []
+    ]
+  );
+
+  return { ok: true, saved: true, note: mapClassNoteRow(result.rows[0]) };
+}
+
+async function handleClassNotes(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, await listClassNotes());
+    return;
+  }
+
+  const body = await readBody(request);
+  sendJson(response, 200, await saveClassNote(body.note || body));
+}
+
 function mapAgentActionRow(row) {
   return {
     id: row.id,
@@ -1289,6 +1440,8 @@ function getDeepSeekRoute(task = "application_packet") {
 function buildAgentActionPrompt(body, route) {
   const action = body.action || {};
   const isRenewableBrief = action.actionType === "renewable_energy_newsletter";
+  const isAssignmentCheckin = action.actionType === "assignment_checkin";
+  const isResearchAdvisor = action.actionType === "research_advisor";
 
   return [
     isRenewableBrief
@@ -1302,6 +1455,10 @@ function buildAgentActionPrompt(body, route) {
     "Return one valid JSON object only. Do not wrap it in markdown.",
     isRenewableBrief
       ? 'Required keys: { "subject": string, "body": string, "trendThemes": string[], "importantDevelopments": string[], "industryImpacts": string[], "investmentAngles": string[], "sourceNotes": string[], "approvalChecklist": string[], "riskNotes": string[] }'
+      : isAssignmentCheckin
+        ? 'Required keys: { "subject": string, "body": string, "actionPlan": string[], "scheduleBlocks": string[], "clarifyingQuestions": string[], "approvalChecklist": string[], "riskNotes": string[] }'
+      : isResearchAdvisor
+        ? 'Required keys: { "subject": string, "body": string, "researchPlan": string[], "suggestedSources": string[], "searchKeywords": string[], "clarifyingQuestions": string[], "approvalChecklist": string[], "riskNotes": string[] }'
       : 'Required keys: { "subject": string, "body": string, "approvalChecklist": string[], "riskNotes": string[] }',
     "",
     "QUALITY RULES:",
@@ -1317,6 +1474,18 @@ function buildAgentActionPrompt(body, route) {
       "- Include student takeaways useful for interviews, coursework, and internship networking.",
       "- If the news evidence is thin or repetitive, say what needs more verification."
     ] : []),
+    ...(isAssignmentCheckin ? [
+      "- Use assignment due dates to create a practical action plan to finish work on time.",
+      "- Break work into schedule blocks ordered by urgency.",
+      "- Ask for missing assignment details, rubrics, or due dates when necessary.",
+      "- Consider current courses and avoid overloading one day."
+    ] : []),
+    ...(isResearchAdvisor ? [
+      "- Use pasted class notes, lecture transcripts, and assignment context to guide the response.",
+      "- Suggest credible source categories such as academic databases, course readings, government datasets, company filings, industry reports, and library resources.",
+      "- Provide search keywords and a step-by-step research plan.",
+      "- Do not fabricate citations or claim sources were read unless supplied in the notes."
+    ] : []),
     "",
     "AGENT ACTION JSON:",
     JSON.stringify(body.action || {}),
@@ -1329,6 +1498,12 @@ function buildAgentActionPrompt(body, route) {
     "",
     "COURSES JSON:",
     JSON.stringify(body.courses || []),
+    "",
+    "ASSIGNMENTS JSON:",
+    JSON.stringify(body.assignments || []),
+    "",
+    "CLASS NOTES JSON:",
+    JSON.stringify(body.classNotes || []),
     "",
     "CURRENT NEWS ITEMS JSON:",
     JSON.stringify(body.newsItems || [])
@@ -1548,6 +1723,8 @@ async function handleAdvisorGenerate(request, response) {
     resumeProfile: body.resumeProfile || {},
     baselineResume: body.baselineResume || {},
     courses: body.courses || [],
+    assignments: body.assignments || [],
+    classNotes: body.classNotes || [],
     newsItems
   };
 
@@ -1692,6 +1869,16 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/courses" && (request.method === "GET" || request.method === "POST" || request.method === "DELETE")) {
       await handleCourses(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/assignments" && (request.method === "GET" || request.method === "POST")) {
+      await handleAssignments(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/class-notes" && (request.method === "GET" || request.method === "POST")) {
+      await handleClassNotes(request, response);
       return;
     }
 

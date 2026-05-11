@@ -182,8 +182,33 @@ type AdvisorResult = {
   industryImpacts?: string[];
   investmentAngles?: string[];
   sourceNotes?: string[];
+  actionPlan?: string[];
+  scheduleBlocks?: string[];
+  researchPlan?: string[];
+  suggestedSources?: string[];
+  searchKeywords?: string[];
+  clarifyingQuestions?: string[];
   approvalChecklist?: string[];
   riskNotes?: string[];
+};
+
+type AssignmentTask = {
+  id?: string;
+  courseName: string;
+  title: string;
+  dueAt: string;
+  details: string;
+  status: "open" | "in_progress" | "done" | "archived";
+  priority: "low" | "medium" | "high";
+};
+
+type ClassNote = {
+  id?: string;
+  courseName: string;
+  title: string;
+  noteType: "notes" | "lecture_transcript" | "reading" | "research";
+  content: string;
+  tags: string[];
 };
 
 type ApplicationPacket = {
@@ -883,6 +908,23 @@ function App() {
   const [advisorPrompt, setAdvisorPrompt] = useState("Renewable energy investment trends, project finance, grid constraints, policy, and M&A themes Eric should understand this week.");
   const [advisorResult, setAdvisorResult] = useState<AdvisorResult | null>(null);
   const [advisorStatus, setAdvisorStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [assignmentTasks, setAssignmentTasks] = useState<AssignmentTask[]>([]);
+  const [classNotes, setClassNotes] = useState<ClassNote[]>([]);
+  const [assignmentForm, setAssignmentForm] = useState<AssignmentTask>({
+    courseName: "",
+    title: "",
+    dueAt: "",
+    details: "",
+    status: "open",
+    priority: "medium"
+  });
+  const [classNoteForm, setClassNoteForm] = useState<ClassNote>({
+    courseName: "",
+    title: "",
+    noteType: "notes",
+    content: "",
+    tags: []
+  });
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -923,6 +965,37 @@ function App() {
       window.localStorage.setItem("student-life.job-search", JSON.stringify(jobSearchState));
     }
   }, [jobSearchState]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncAdvisorContext() {
+      try {
+        const [assignmentResponse, noteResponse] = await Promise.all([
+          fetch("http://localhost:8787/api/assignments"),
+          fetch("http://localhost:8787/api/class-notes")
+        ]);
+        const assignmentPayload = assignmentResponse.ok ? await assignmentResponse.json() : { assignments: [] };
+        const notePayload = noteResponse.ok ? await noteResponse.json() : { notes: [] };
+
+        if (!isMounted) return;
+        if (Array.isArray(assignmentPayload.assignments)) {
+          setAssignmentTasks(assignmentPayload.assignments);
+        }
+        if (Array.isArray(notePayload.notes)) {
+          setClassNotes(notePayload.notes);
+        }
+      } catch {
+        // Advisor context remains local-only if Supabase is unavailable.
+      }
+    }
+
+    void syncAdvisorContext();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1314,7 +1387,9 @@ function App() {
           action,
           resumeProfile,
           baselineResume,
-          courses: courseList
+          courses: courseList,
+          assignments: assignmentTasks,
+          classNotes
         })
       });
 
@@ -1392,7 +1467,9 @@ function App() {
           prompt: advisorPrompt,
           resumeProfile,
           baselineResume,
-          courses: courseList
+          courses: courseList,
+          assignments: assignmentTasks,
+          classNotes
         })
       });
 
@@ -1406,6 +1483,80 @@ function App() {
     } catch {
       setAdvisorStatus("error");
     }
+  }
+
+  async function saveAssignmentTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!assignmentForm.title.trim()) return;
+
+    const assignment = {
+      ...assignmentForm,
+      courseName: assignmentForm.courseName.trim() || "General",
+      title: assignmentForm.title.trim()
+    };
+    setAssignmentTasks((currentTasks) => [assignment, ...currentTasks]);
+
+    try {
+      const response = await fetch("http://localhost:8787/api/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignment })
+      });
+      const payload = response.ok ? await response.json() : null;
+      if (payload?.assignment) {
+        setAssignmentTasks((currentTasks) =>
+          currentTasks.map((task) => task === assignment ? payload.assignment : task)
+        );
+      }
+    } catch {
+      // Keep local assignment context available for the current session.
+    }
+
+    setAssignmentForm({
+      courseName: "",
+      title: "",
+      dueAt: "",
+      details: "",
+      status: "open",
+      priority: "medium"
+    });
+  }
+
+  async function saveClassNote(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!classNoteForm.content.trim()) return;
+
+    const note = {
+      ...classNoteForm,
+      courseName: classNoteForm.courseName.trim() || "General",
+      title: classNoteForm.title.trim() || "Class note",
+      tags: classNoteForm.tags
+    };
+    setClassNotes((currentNotes) => [note, ...currentNotes]);
+
+    try {
+      const response = await fetch("http://localhost:8787/api/class-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note })
+      });
+      const payload = response.ok ? await response.json() : null;
+      if (payload?.note) {
+        setClassNotes((currentNotes) =>
+          currentNotes.map((currentNote) => currentNote === note ? payload.note : currentNote)
+        );
+      }
+    } catch {
+      // Keep local note context available for the current session.
+    }
+
+    setClassNoteForm({
+      courseName: "",
+      title: "",
+      noteType: "notes",
+      content: "",
+      tags: []
+    });
   }
 
   async function runLiveJobSearch() {
@@ -2553,11 +2704,71 @@ function App() {
                   placeholder={advisorModes[advisorTask].prompt}
                 />
               </label>
+              {advisorTask === "assignment_checkin" ? (
+                <form className="advisor-subform" onSubmit={saveAssignmentTask}>
+                  <strong>Add assignment</strong>
+                  <input
+                    value={assignmentForm.courseName}
+                    onChange={(event) => setAssignmentForm({ ...assignmentForm, courseName: event.target.value })}
+                    placeholder="Course"
+                  />
+                  <input
+                    value={assignmentForm.title}
+                    onChange={(event) => setAssignmentForm({ ...assignmentForm, title: event.target.value })}
+                    placeholder="Assignment"
+                  />
+                  <input
+                    type="datetime-local"
+                    value={assignmentForm.dueAt}
+                    onChange={(event) => setAssignmentForm({ ...assignmentForm, dueAt: event.target.value })}
+                  />
+                  <textarea
+                    value={assignmentForm.details}
+                    onChange={(event) => setAssignmentForm({ ...assignmentForm, details: event.target.value })}
+                    placeholder="Requirements, grading criteria, blockers, or estimated work"
+                  />
+                  <button className="ghost-button" type="submit">Save assignment</button>
+                </form>
+              ) : null}
+              {advisorTask === "research_advisor" ? (
+                <form className="advisor-subform" onSubmit={saveClassNote}>
+                  <strong>Save class notes or transcript</strong>
+                  <input
+                    value={classNoteForm.courseName}
+                    onChange={(event) => setClassNoteForm({ ...classNoteForm, courseName: event.target.value })}
+                    placeholder="Course"
+                  />
+                  <input
+                    value={classNoteForm.title}
+                    onChange={(event) => setClassNoteForm({ ...classNoteForm, title: event.target.value })}
+                    placeholder="Note title"
+                  />
+                  <select
+                    value={classNoteForm.noteType}
+                    onChange={(event) => setClassNoteForm({ ...classNoteForm, noteType: event.target.value as ClassNote["noteType"] })}
+                  >
+                    <option value="notes">Class notes</option>
+                    <option value="lecture_transcript">Lecture transcript</option>
+                    <option value="reading">Reading notes</option>
+                    <option value="research">Research notes</option>
+                  </select>
+                  <textarea
+                    value={classNoteForm.content}
+                    onChange={(event) => setClassNoteForm({ ...classNoteForm, content: event.target.value })}
+                    placeholder="Paste lecture notes, transcript, readings, or assignment context"
+                  />
+                  <button className="ghost-button" type="submit">Save notes</button>
+                </form>
+              ) : null}
               <button className="primary-button" type="button" onClick={runAdvisorTask} disabled={advisorStatus === "loading"}>
                 <Sparkles size={16} /> {advisorStatus === "loading" ? "Generating" : "Run advisor"}
               </button>
             </div>
             <div className="advisor-output">
+              <div className="advisor-context">
+                <strong>Saved context</strong>
+                <span>{assignmentTasks.length} assignments · {classNotes.length} notes</span>
+              </div>
               {advisorResult ? (
                 <>
                   <strong>{advisorResult.subject || "Advisor response"}</strong>
@@ -2567,6 +2778,12 @@ function App() {
                   <AdvisorList title="Industry impact" items={advisorResult.industryImpacts} />
                   <AdvisorList title="Investment angles" items={advisorResult.investmentAngles} />
                   <AdvisorList title="Source notes" items={advisorResult.sourceNotes} />
+                  <AdvisorList title="Action plan" items={advisorResult.actionPlan} />
+                  <AdvisorList title="Schedule blocks" items={advisorResult.scheduleBlocks} />
+                  <AdvisorList title="Research plan" items={advisorResult.researchPlan} />
+                  <AdvisorList title="Suggested sources" items={advisorResult.suggestedSources} />
+                  <AdvisorList title="Search keywords" items={advisorResult.searchKeywords} />
+                  <AdvisorList title="Clarifying questions" items={advisorResult.clarifyingQuestions} />
                   <AdvisorList title="Approval checklist" items={advisorResult.approvalChecklist} />
                   <AdvisorList title="Risk notes" items={advisorResult.riskNotes} />
                 </>
@@ -2576,6 +2793,20 @@ function App() {
                   <span>Use this page for direct help. It does not create an agent draft unless Eric asks to turn the output into one.</span>
                 </div>
               )}
+              {assignmentTasks.length > 0 && advisorTask === "assignment_checkin" ? (
+                <AdvisorList
+                  title="Saved assignments"
+                  items={assignmentTasks.slice(0, 6).map((assignment) =>
+                    `${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}`
+                  )}
+                />
+              ) : null}
+              {classNotes.length > 0 && advisorTask === "research_advisor" ? (
+                <AdvisorList
+                  title="Saved notes"
+                  items={classNotes.slice(0, 6).map((note) => `${note.courseName}: ${note.title} (${note.noteType.replace("_", " ")})`)}
+                />
+              ) : null}
             </div>
           </div>
         </section>

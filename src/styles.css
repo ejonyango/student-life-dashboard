@@ -659,6 +659,40 @@ button {
   resize: vertical;
 }
 
+.advisor-subform {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.advisor-subform input,
+.advisor-subform select,
+.advisor-subform textarea {
+  width: 100%;
+}
+
+.advisor-subform textarea {
+  min-height: 108px;
+  resize: vertical;
+}
+
+.advisor-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dceff6;
+}
+
+.advisor-context span {
+  color: #5e7180;
+  font-size: 0.9rem;
+}
+
 .advisor-output {
   align-content: start;
 }
