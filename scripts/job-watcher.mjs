@@ -286,7 +286,7 @@ async function fetchRapidApiJobs(search) {
     country: "us",
     date_posted: "month"
   });
-  const response = await fetch(`https://${providerConfig.rapidApiJobsHost}/search?${params.toString()}`, {
+  const response = await fetch(`https://${providerConfig.rapidApiJobsHost}/search-v2?${params.toString()}`, {
     headers: {
       "X-RapidAPI-Key": providerConfig.rapidApiKey,
       "X-RapidAPI-Host": providerConfig.rapidApiJobsHost
@@ -298,7 +298,7 @@ async function fetchRapidApiJobs(search) {
   }
 
   const payload = await response.json();
-  const jobs = payload.data || payload.results || payload.jobs || [];
+  const jobs = payload.data?.jobs || payload.data || payload.results || payload.jobs || [];
 
   return {
     provider: "RapidAPI",
