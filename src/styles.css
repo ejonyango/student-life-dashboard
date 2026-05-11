@@ -31,6 +31,10 @@ button {
   cursor: pointer;
 }
 
+.hidden-page {
+  display: none !important;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

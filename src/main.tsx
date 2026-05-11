@@ -132,6 +132,15 @@ type MatchedListing = Listing & {
   fit: number;
 };
 
+type Page =
+  | "dashboard"
+  | "available-listings"
+  | "applications"
+  | "school"
+  | "agents"
+  | "social"
+  | "resume";
+
 const defaultResumeProfile: ResumeProfile = {
   fileName: "Eric Onyango Resume.pdf",
   text:
@@ -708,7 +717,23 @@ const statusClass: Record<Application["status"], string> = {
   "Offer prep": "green"
 };
 
+const pageTitles: Record<Page, string> = {
+  dashboard: "Eric’s Dashboard",
+  "available-listings": "Available Listings",
+  applications: "Applications",
+  school: "School",
+  agents: "Agents",
+  social: "Network",
+  resume: "Resume"
+};
+
+function getPageFromHash(): Page {
+  const page = window.location.hash.replace("#", "") as Page;
+  return pageTitles[page] ? page : "dashboard";
+}
+
 function App() {
+  const [currentPage, setCurrentPage] = useState<Page>(() => getPageFromHash());
   const [courseList, setCourseList] = useState<Lesson[]>(initialCourses);
   const [courseForm, setCourseForm] = useState<Lesson>({
     course: "",
@@ -731,6 +756,13 @@ function App() {
   const highPriorityTasks = navigateTasks.filter((task) => task.priority === "High");
   const nextClass = courseList[0];
   const savedSignalCount = resumeProfile.skills.length + resumeProfile.experience.length + resumeProfile.keywords.length;
+
+  useEffect(() => {
+    const syncPage = () => setCurrentPage(getPageFromHash());
+    window.addEventListener("hashchange", syncPage);
+    syncPage();
+    return () => window.removeEventListener("hashchange", syncPage);
+  }, []);
 
   useEffect(() => {
     setKeywordInput(resumeProfile.keywords.join(", "));
@@ -810,25 +842,25 @@ function App() {
         </div>
 
         <nav className="nav-list" aria-label="Primary">
-          <a className="active" href="#dashboard">
+          <a className={currentPage === "dashboard" ? "active" : ""} href="#dashboard">
             <Target size={18} /> <span>Dashboard</span>
           </a>
-          <a href="#available-listings">
+          <a className={currentPage === "available-listings" ? "active" : ""} href="#available-listings">
             <Search size={18} /> <span>Available listings</span>
           </a>
-          <a href="#applications">
+          <a className={currentPage === "applications" ? "active" : ""} href="#applications">
             <BriefcaseBusiness size={18} /> <span>Applications</span>
           </a>
-          <a href="#school">
+          <a className={currentPage === "school" ? "active" : ""} href="#school">
             <CalendarDays size={18} /> <span>School</span>
           </a>
-          <a href="#agents">
+          <a className={currentPage === "agents" ? "active" : ""} href="#agents">
             <Bot size={18} /> <span>Agents</span>
           </a>
-          <a href="#social">
+          <a className={currentPage === "social" ? "active" : ""} href="#social">
             <Network size={18} /> <span>Network</span>
           </a>
-          <a href="#resume">
+          <a className={currentPage === "resume" ? "active" : ""} href="#resume">
             <FileText size={18} /> <span>Resume</span>
           </a>
         </nav>
@@ -846,7 +878,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Monday, May 11</p>
-            <h1>Eric’s Dashboard</h1>
+            <h1>{pageTitles[currentPage]}</h1>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" title="Sync connected accounts">
@@ -858,7 +890,7 @@ function App() {
           </div>
         </header>
 
-        <section className="hero-panel dashboard-hero" id="dashboard">
+        <section className={`hero-panel dashboard-hero ${currentPage === "dashboard" ? "" : "hidden-page"}`} id="dashboard">
           <div>
               <p className="eyebrow">Eric Onyango profile</p>
             <h2>
@@ -885,7 +917,7 @@ function App() {
           </div>
         </section>
 
-        <section className="dashboard-command" aria-label="Eric dashboard command center">
+        <section className={`dashboard-command ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Eric dashboard command center">
           <article className="command-primary">
             <p className="eyebrow">Today’s focus</p>
             <h3>Keep finance recruiting, Fall registration, and Navigate360 tasks moving together.</h3>
@@ -919,7 +951,7 @@ function App() {
           </article>
         </section>
 
-        <section className="metric-grid compact-metrics" aria-label="Student life metrics">
+        <section className={`metric-grid compact-metrics ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Student life metrics">
           <Metric label="Resume skills" value={String(resumeProfile.skills.length)} detail="Saved from upload" />
           <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
           <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
@@ -932,8 +964,8 @@ function App() {
           />
         </section>
 
-        <section className="dashboard-overview-grid">
-          <article className="overview-panel" id="applications">
+        <section className={`dashboard-overview-grid ${currentPage === "dashboard" ? "" : "hidden-page"}`}>
+          <article className="overview-panel">
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Recruiting</p>
@@ -991,7 +1023,7 @@ function App() {
           </article>
         </section>
 
-        <section className="panel resume-intake" id="resume">
+        <section className={`panel resume-intake ${currentPage === "resume" ? "" : "hidden-page"}`} id="resume">
           <div className="panel-header">
             <div>
               <p className="eyebrow">Resume workspace</p>
@@ -1076,7 +1108,7 @@ function App() {
           </div>
         </section>
 
-        <section className="panel listings-panel" id="available-listings">
+        <section className={`panel listings-panel ${currentPage === "available-listings" ? "" : "hidden-page"}`} id="available-listings">
           <div className="panel-header">
             <div>
               <p className="eyebrow">Available listings</p>
@@ -1129,7 +1161,34 @@ function App() {
           ) : null}
         </section>
 
-        <section className="two-column">
+        <section className={`panel applications-page ${currentPage === "applications" ? "" : "hidden-page"}`} id="applications">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Pipeline</p>
+              <h3>Eric’s internship applications</h3>
+            </div>
+            <button className="ghost-button">New application</button>
+          </div>
+          <div className="application-list">
+            {applications.map((application) => (
+              <article className="application-row" key={`${application.company}-${application.role}`}>
+                <div>
+                  <strong>{application.company}</strong>
+                  <span>{application.role}</span>
+                </div>
+                <span className={`status ${statusClass[application.status]}`}>
+                  {application.status}
+                </span>
+                <div className="fit-score" aria-label={`${application.fit}% fit`}>
+                  <span style={{ width: `${application.fit}%` }} />
+                </div>
+                <p>{application.next}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={`two-column ${currentPage === "school" ? "" : "hidden-page"}`}>
           <div className="panel dashboard-courses">
             <div className="panel-header">
               <div>
@@ -1156,7 +1215,7 @@ function App() {
           </div>
         </section>
 
-        <section className="panel school-editor" id="school">
+        <section className={`panel school-editor ${currentPage === "school" ? "" : "hidden-page"}`} id="school">
           <div className="panel-header">
             <div>
               <p className="eyebrow">School</p>
@@ -1254,8 +1313,8 @@ function App() {
           </div>
         </section>
 
-        <section className="three-column">
-          <div className="panel" id="agents">
+        <section className={`three-column ${currentPage === "agents" || currentPage === "social" ? "" : "hidden-page"}`}>
+          <div className={`panel ${currentPage === "agents" ? "" : "hidden-page"}`} id="agents">
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Autopilot</p>
@@ -1276,7 +1335,7 @@ function App() {
             </div>
           </div>
 
-          <div className="panel">
+          <div className="panel hidden-page">
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Resume</p>
@@ -1294,7 +1353,7 @@ function App() {
             </button>
           </div>
 
-          <div className="panel" id="social">
+          <div className={`panel ${currentPage === "social" ? "" : "hidden-page"}`} id="social">
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Presence</p>
@@ -1310,7 +1369,7 @@ function App() {
           </div>
         </section>
 
-        <section className="panel class-integration">
+        <section className={`panel class-integration ${currentPage === "school" ? "" : "hidden-page"}`}>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Registered classes</p>
