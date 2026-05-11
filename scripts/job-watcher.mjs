@@ -15,6 +15,37 @@ const PORT = Number(process.env.JOB_WATCHER_PORT || 8787);
 const MAX_RESULTS = 500;
 const CACHE_DIR = ".cache/job-watcher";
 const THEIRSTACK_CACHE_PATH = `${CACHE_DIR}/theirstack.json`;
+const excludedTitlePatterns = [
+  /\bvice president\b/i,
+  /\bvp\b/i,
+  /\bsvp\b/i,
+  /\bavp\b/i,
+  /\bchief\b/i,
+  /\bcfo\b/i,
+  /\bcontroller\b/i,
+  /\bdirector\b/i,
+  /\bhead of\b/i,
+  /\bprincipal\b/i,
+  /\bpartner\b/i,
+  /\bsenior\b/i,
+  /\bsr\.?\b/i,
+  /\bmanager\b/i,
+  /\blead\b/i,
+  /\bstaff\b/i,
+  /\bexperienced\b/i
+];
+const studentFriendlyPatterns = [
+  /\bintern\b/i,
+  /\binternship\b/i,
+  /\bsummer analyst\b/i,
+  /\banalyst intern\b/i,
+  /\bearly career\b/i,
+  /\bentry level\b/i,
+  /\bgraduate\b/i,
+  /\btrainee\b/i,
+  /\bco-?op\b/i,
+  /\bapprentice\b/i
+];
 
 const providerConfig = {
   theirStack: process.env.THEIRSTACK_API_KEY || "",
@@ -180,6 +211,15 @@ function dedupe(listings) {
     seen.add(key);
     return true;
   });
+}
+
+function isStudentAppropriateListing(listing) {
+  const role = listing.role || "";
+  const combinedText = `${listing.role} ${listing.sourceDescription}`;
+  const hasStudentSignal = studentFriendlyPatterns.some((pattern) => pattern.test(combinedText));
+  const hasExcludedTitle = excludedTitlePatterns.some((pattern) => pattern.test(role));
+
+  return hasStudentSignal && !hasExcludedTitle;
 }
 
 async function providerError(response, provider) {
@@ -365,7 +405,9 @@ async function handleJobSearch(request, response) {
       listings: []
     };
   });
-  const listings = dedupe(providerResults.flatMap((result) => result.listings)).slice(0, MAX_RESULTS);
+  const listings = dedupe(providerResults.flatMap((result) => result.listings))
+    .filter(isStudentAppropriateListing)
+    .slice(0, MAX_RESULTS);
 
   sendJson(response, 200, {
     checkedAt: new Date().toISOString(),
