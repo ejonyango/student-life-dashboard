@@ -61,7 +61,9 @@ const providerConfig = {
   rapidApiJobsHost: process.env.RAPIDAPI_JOBS_HOST || "jsearch.p.rapidapi.com",
   deepSeekKey: localEnv.DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY ?? "",
   deepSeekBaseUrl: (localEnv.DEEPSEEK_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, ""),
-  deepSeekModel: localEnv.DEEPSEEK_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-v4-pro"
+  deepSeekFastModel: localEnv.DEEPSEEK_FAST_MODEL || process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash",
+  deepSeekProModel: localEnv.DEEPSEEK_PRO_MODEL || process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro",
+  deepSeekPacketRoute: localEnv.DEEPSEEK_PACKET_ROUTE || process.env.DEEPSEEK_PACKET_ROUTE || "fast"
 };
 
 let theirStackMemoryCache = null;
@@ -482,11 +484,13 @@ function parseJsonBlock(value) {
 function fallbackPacket(body, message = "DeepSeek is not configured yet. Using deterministic fallback packet.") {
   const listing = body.listing || {};
   const matchedTerms = Array.isArray(listing.matchedTerms) ? listing.matchedTerms.slice(0, 5) : [];
+  const route = getDeepSeekRoute(body.task || "application_packet");
 
   return {
     status: providerConfig.deepSeekKey ? "fallback" : "missing_key",
     generatedBy: providerConfig.deepSeekKey ? "Fallback parser" : "Template fallback",
-    model: providerConfig.deepSeekModel,
+    model: route.model,
+    thinking: route.thinking,
     message,
     packet: {
       resumeFocus: matchedTerms.length
@@ -512,24 +516,76 @@ function fallbackPacket(body, message = "DeepSeek is not configured yet. Using d
   };
 }
 
+function getDeepSeekRoute(task = "application_packet") {
+  const routes = {
+    quick_note: {
+      model: providerConfig.deepSeekFastModel,
+      thinking: { type: "disabled" },
+      timeoutMs: 12000
+    },
+    resume_rewrite: {
+      model: providerConfig.deepSeekFastModel,
+      thinking: { type: "disabled" },
+      timeoutMs: 15000
+    },
+    application_packet: {
+      model: providerConfig.deepSeekPacketRoute === "pro" ? providerConfig.deepSeekProModel : providerConfig.deepSeekFastModel,
+      thinking: providerConfig.deepSeekPacketRoute === "pro"
+        ? { type: "enabled", reasoning_effort: "high" }
+        : { type: "disabled" },
+      timeoutMs: providerConfig.deepSeekPacketRoute === "pro" ? 30000 : 25000
+    },
+    final_review: {
+      model: providerConfig.deepSeekProModel,
+      thinking: { type: "enabled", reasoning_effort: "high" },
+      timeoutMs: 30000
+    }
+  };
+
+  return routes[task] || routes.application_packet;
+}
+
+function buildApplicationPacketPrompt(body, route) {
+  return [
+    "TASK: Create an approval-first internship application packet for one student.",
+    "STUDENT: Eric Onyango, Loyola University Chicago, BBA Finance.",
+    "MODEL ROUTE:",
+    JSON.stringify(route),
+    "",
+    "OUTPUT CONTRACT:",
+    "Return one valid JSON object only. Do not wrap it in markdown. Do not add commentary.",
+    "Required keys:",
+    '{ "resumeFocus": string[], "coverNote": string, "talkingPoints": string[], "commonAnswers": string[], "reviewWarnings": string[], "fitSummary": string }',
+    "",
+    "QUALITY RULES:",
+    "- Be specific to the job and Eric's resume.",
+    "- Do not invent facts, dates, awards, employers, or application submission status.",
+    "- Keep resumeFocus as actionable edits, not generic advice.",
+    "- Keep coverNote under 120 words.",
+    "- Include approval/safety warnings before submission.",
+    "- If evidence is weak, say what must be verified.",
+    "",
+    "JOB LISTING JSON:",
+    JSON.stringify(body.listing || {}),
+    "",
+    "BASELINE RESUME JSON:",
+    JSON.stringify(body.baselineResume || {}),
+    "",
+    "RESUME PROFILE JSON:",
+    JSON.stringify(body.resumeProfile || {})
+  ].join("\n");
+}
+
 async function handleApplicationPacket(request, response) {
   const body = await readBody(request);
+  const route = getDeepSeekRoute(body.task || "application_packet");
 
   if (!providerConfig.deepSeekKey) {
     sendJson(response, 200, fallbackPacket(body));
     return;
   }
 
-  const prompt = [
-    "You are an internship application assistant for one student, Eric Onyango at Loyola University Chicago.",
-    "Create an approval-first application packet. Do not claim the application has been submitted.",
-    "Return strict JSON with keys: resumeFocus array, coverNote string, talkingPoints array, commonAnswers array, reviewWarnings array, fitSummary string.",
-    "Keep the writing specific, practical, truthful, and suitable for a finance internship application.",
-    "",
-    `Job listing: ${JSON.stringify(body.listing || {})}`,
-    `Baseline resume: ${JSON.stringify(body.baselineResume || {})}`,
-    `Resume profile: ${JSON.stringify(body.resumeProfile || {})}`
-  ].join("\n");
+  const prompt = buildApplicationPacketPrompt(body, route);
 
   let deepSeekResponse;
 
@@ -541,19 +597,22 @@ async function handleApplicationPacket(request, response) {
         "Content-Type": "application/json"
       },
       {
-        model: providerConfig.deepSeekModel,
+        model: route.model,
         messages: [
           {
             role: "system",
-            content: "You produce concise, structured JSON for student internship application preparation."
+            content: "You are a precise application-packet generator. You return valid JSON only and follow the output contract exactly."
           },
           {
             role: "user",
             content: prompt
           }
         ],
+        thinking: route.thinking,
+        response_format: { type: "json_object" },
         temperature: 0.3
-      }
+      },
+      route.timeoutMs
     );
   } catch (error) {
     sendJson(response, 200, fallbackPacket(body, error.message || "DeepSeek request failed."));
@@ -580,8 +639,9 @@ async function handleApplicationPacket(request, response) {
     sendJson(response, 200, {
       status: "ok",
       generatedBy: "DeepSeek",
-      model: providerConfig.deepSeekModel,
-      message: "AI packet generated with DeepSeek.",
+      model: route.model,
+      thinking: route.thinking,
+      message: `AI packet generated with DeepSeek using ${route.model}.`,
       packet
     });
   } catch {
@@ -607,7 +667,11 @@ const server = createServer(async (request, response) => {
           rapidApi: Boolean(providerConfig.rapidApiKey),
           deepSeek: Boolean(providerConfig.deepSeekKey),
           deepSeekBaseUrl: providerConfig.deepSeekBaseUrl,
-          deepSeekModel: providerConfig.deepSeekModel
+          deepSeekFastModel: providerConfig.deepSeekFastModel,
+          deepSeekProModel: providerConfig.deepSeekProModel,
+          deepSeekPacketRoute: providerConfig.deepSeekPacketRoute,
+          deepSeekPacketModel: getDeepSeekRoute("application_packet").model,
+          deepSeekPacketThinking: getDeepSeekRoute("application_packet").thinking
         }
       });
       return;

@@ -967,7 +967,7 @@ function App() {
     setApplicationPacket(createApplicationPacket(listing, baselineResume, {
       aiStatus: "fallback",
       generatedBy: "Preparing AI packet",
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       aiMessage: "Calling DeepSeek packet generator..."
     }));
 
@@ -978,6 +978,7 @@ function App() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          task: "application_packet",
           listing,
           baselineResume,
           resumeProfile
@@ -992,7 +993,7 @@ function App() {
       setApplicationPacket(createApplicationPacket(listing, baselineResume, {
         aiStatus: payload.status || "fallback",
         generatedBy: payload.generatedBy || "DeepSeek",
-        model: payload.model || "deepseek-v4-pro",
+        model: payload.model || "deepseek-v4-flash",
         aiMessage: payload.message || "AI packet ready.",
         packet: payload.packet
       }));
@@ -1001,7 +1002,7 @@ function App() {
       setApplicationPacket(createApplicationPacket(listing, baselineResume, {
         aiStatus: "error",
         generatedBy: "Template fallback",
-        model: "deepseek-v4-pro",
+        model: "deepseek-v4-flash",
         aiMessage: error instanceof Error ? error.message : "Unable to reach DeepSeek packet endpoint."
       }));
       setPacketStatus("error");
@@ -2165,7 +2166,7 @@ function createApplicationPacket(
     fitSummary: typeof packet.fitSummary === "string" ? packet.fitSummary : fallbackPacket.fitSummary,
     coverNote: typeof packet.coverNote === "string" ? packet.coverNote : fallbackPacket.coverNote,
     generatedBy: aiResult?.generatedBy || "Template fallback",
-    model: aiResult?.model || "deepseek-v4-pro",
+    model: aiResult?.model || "deepseek-v4-flash",
     aiStatus: aiResult?.aiStatus || "missing_key",
     aiMessage: aiResult?.aiMessage || "Add DEEPSEEK_API_KEY to enable live AI generation."
   };
