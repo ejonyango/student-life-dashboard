@@ -1005,9 +1005,37 @@ button {
   color: #5e7180;
 }
 
+.ai-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  color: #0b2f47;
+  background: #e6f7fd;
+  border: 1px solid #bdefff;
+  border-radius: 8px;
+}
+
+.ai-status.missing_key,
+.ai-status.fallback {
+  background: #fff8d7;
+  border-color: #f2df89;
+}
+
+.ai-status.error {
+  color: #8b001a;
+  background: #ffe8ed;
+  border-color: #ffc3cf;
+}
+
+.ai-status span {
+  color: inherit;
+  line-height: 1.45;
+}
+
 .packet-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 

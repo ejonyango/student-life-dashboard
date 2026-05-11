@@ -1,13 +1,19 @@
 import { createServer } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { URL } from "node:url";
+
+const localEnv = {};
 
 if (existsSync(".env")) {
   const envFile = readFileSync(".env", "utf8");
   for (const line of envFile.split(/\r?\n/)) {
     const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
-    if (!match || process.env[match[1]]) continue;
-    process.env[match[1]] = match[2].replace(/^["']|["']$/g, "");
+    if (!match) continue;
+    localEnv[match[1]] = match[2].replace(/^["']|["']$/g, "");
+    if (!process.env[match[1]]) {
+      process.env[match[1]] = localEnv[match[1]];
+    }
   }
 }
 
@@ -52,7 +58,10 @@ const providerConfig = {
   serpApi: process.env.SERPAPI_API_KEY || "",
   rapidApiKey: process.env.RAPIDAPI_KEY || "",
   rapidApiAppId: process.env.RAPIDAPI_APP_ID || "",
-  rapidApiJobsHost: process.env.RAPIDAPI_JOBS_HOST || "jsearch.p.rapidapi.com"
+  rapidApiJobsHost: process.env.RAPIDAPI_JOBS_HOST || "jsearch.p.rapidapi.com",
+  deepSeekKey: localEnv.DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY ?? "",
+  deepSeekBaseUrl: (localEnv.DEEPSEEK_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, ""),
+  deepSeekModel: localEnv.DEEPSEEK_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-v4-pro"
 };
 
 let theirStackMemoryCache = null;
@@ -230,6 +239,47 @@ async function providerError(response, provider) {
   } catch {
     return text ? `${provider} returned ${response.status}: ${text.slice(0, 180)}` : `${provider} returned ${response.status}.`;
   }
+}
+
+function postJsonWithTimeout(url, headers, payload, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const body = JSON.stringify(payload);
+    const request = httpsRequest(
+      {
+        hostname: target.hostname,
+        path: `${target.pathname}${target.search}`,
+        method: "POST",
+        headers: {
+          ...headers,
+          "Content-Length": Buffer.byteLength(body)
+        },
+        timeout: timeoutMs
+      },
+      (response) => {
+        let responseBody = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          responseBody += chunk;
+        });
+        response.on("end", () => {
+          resolve({
+            ok: response.statusCode >= 200 && response.statusCode < 300,
+            status: response.statusCode,
+            text: responseBody,
+            json: () => JSON.parse(responseBody)
+          });
+        });
+      }
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error(`Request timed out after ${timeoutMs / 1000} seconds.`));
+    });
+    request.on("error", reject);
+    request.write(body);
+    request.end();
+  });
 }
 
 async function fetchTheirStack(search) {
@@ -422,6 +472,123 @@ async function handleJobSearch(request, response) {
   });
 }
 
+function parseJsonBlock(value) {
+  const text = String(value || "").trim();
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1] || text.match(/\{[\s\S]*\}/)?.[0] || text;
+  return JSON.parse(candidate);
+}
+
+function fallbackPacket(body, message = "DeepSeek is not configured yet. Using deterministic fallback packet.") {
+  const listing = body.listing || {};
+  const matchedTerms = Array.isArray(listing.matchedTerms) ? listing.matchedTerms.slice(0, 5) : [];
+
+  return {
+    status: providerConfig.deepSeekKey ? "fallback" : "missing_key",
+    generatedBy: providerConfig.deepSeekKey ? "Fallback parser" : "Template fallback",
+    model: providerConfig.deepSeekModel,
+    message,
+    packet: {
+      resumeFocus: matchedTerms.length
+        ? matchedTerms.map((term) => `Emphasize ${term} in the tailored summary and strongest relevant bullets.`)
+        : ["Emphasize finance analysis, Excel, communication, and investment research experience."],
+      coverNote: `I am interested in the ${listing.role || "internship"} opportunity at ${listing.company || "the company"}. My finance coursework, investment research work, and analytical experience position me to contribute quickly while continuing to grow through a rigorous internship experience.`,
+      talkingPoints: [
+        `Connect Eric's finance background to ${listing.company || "the employer"}'s internship needs.`,
+        "Use concrete evidence from investment research, financial modeling, and presentation work.",
+        "Confirm role fit, timing, location, and application requirements before submission."
+      ],
+      commonAnswers: [
+        "Why this company: cite the role description and connect it to finance, markets, and analytical interests.",
+        "Availability: confirm semester workload, interview windows, and start-date flexibility.",
+        "Work authorization: answer only with Eric's reviewed and approved wording."
+      ],
+      reviewWarnings: [
+        "Student approval required before any application is submitted.",
+        "Verify the company career page or durable application link before applying."
+      ],
+      fitSummary: "This packet was generated without a live LLM response."
+    }
+  };
+}
+
+async function handleApplicationPacket(request, response) {
+  const body = await readBody(request);
+
+  if (!providerConfig.deepSeekKey) {
+    sendJson(response, 200, fallbackPacket(body));
+    return;
+  }
+
+  const prompt = [
+    "You are an internship application assistant for one student, Eric Onyango at Loyola University Chicago.",
+    "Create an approval-first application packet. Do not claim the application has been submitted.",
+    "Return strict JSON with keys: resumeFocus array, coverNote string, talkingPoints array, commonAnswers array, reviewWarnings array, fitSummary string.",
+    "Keep the writing specific, practical, truthful, and suitable for a finance internship application.",
+    "",
+    `Job listing: ${JSON.stringify(body.listing || {})}`,
+    `Baseline resume: ${JSON.stringify(body.baselineResume || {})}`,
+    `Resume profile: ${JSON.stringify(body.resumeProfile || {})}`
+  ].join("\n");
+
+  let deepSeekResponse;
+
+  try {
+    deepSeekResponse = await postJsonWithTimeout(
+      `${providerConfig.deepSeekBaseUrl}/chat/completions`,
+      {
+        Authorization: `Bearer ${providerConfig.deepSeekKey}`,
+        "Content-Type": "application/json"
+      },
+      {
+        model: providerConfig.deepSeekModel,
+        messages: [
+          {
+            role: "system",
+            content: "You produce concise, structured JSON for student internship application preparation."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.3
+      }
+    );
+  } catch (error) {
+    sendJson(response, 200, fallbackPacket(body, error.message || "DeepSeek request failed."));
+    return;
+  }
+
+  if (!deepSeekResponse.ok) {
+    let message = `DeepSeek returned ${deepSeekResponse.status}.`;
+    try {
+      const errorPayload = JSON.parse(deepSeekResponse.text);
+      message = errorPayload.error?.message || errorPayload.message || message;
+    } catch {
+      message = deepSeekResponse.text || message;
+    }
+    sendJson(response, 200, fallbackPacket(body, message));
+    return;
+  }
+
+  const payload = deepSeekResponse.json();
+  const content = payload.choices?.[0]?.message?.content || "";
+
+  try {
+    const packet = parseJsonBlock(content);
+    sendJson(response, 200, {
+      status: "ok",
+      generatedBy: "DeepSeek",
+      model: providerConfig.deepSeekModel,
+      message: "AI packet generated with DeepSeek.",
+      packet
+    });
+  } catch {
+    sendJson(response, 200, fallbackPacket(body, "DeepSeek returned a response that could not be parsed as JSON."));
+  }
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     sendJson(response, 200, {});
@@ -437,7 +604,10 @@ const server = createServer(async (request, response) => {
         providers: {
           theirStack: Boolean(providerConfig.theirStack),
           serpApi: Boolean(providerConfig.serpApi),
-          rapidApi: Boolean(providerConfig.rapidApiKey)
+          rapidApi: Boolean(providerConfig.rapidApiKey),
+          deepSeek: Boolean(providerConfig.deepSeekKey),
+          deepSeekBaseUrl: providerConfig.deepSeekBaseUrl,
+          deepSeekModel: providerConfig.deepSeekModel
         }
       });
       return;
@@ -445,6 +615,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/job-search" && request.method === "POST") {
       await handleJobSearch(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/application-packet" && request.method === "POST") {
+      await handleApplicationPacket(request, response);
       return;
     }
 

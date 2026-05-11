@@ -164,6 +164,12 @@ type ApplicationPacket = {
   coverNote: string;
   talkingPoints: string[];
   commonAnswers: string[];
+  reviewWarnings: string[];
+  fitSummary: string;
+  generatedBy: string;
+  model: string;
+  aiStatus: "ok" | "missing_key" | "fallback" | "error";
+  aiMessage: string;
 };
 
 type Page =
@@ -818,6 +824,7 @@ function App() {
   const [navigateItems, setNavigateItems] = useState<NavigateItem[]>([]);
   const [applicationList, setApplicationList] = useState<Application[]>(initialApplications);
   const [applicationPacket, setApplicationPacket] = useState<ApplicationPacket | null>(null);
+  const [packetStatus, setPacketStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -955,8 +962,50 @@ function App() {
     setNavigateItems(parseNavigate360Text(navigateText));
   }
 
-  function prepareApplication(listing: MatchedListing) {
-    setApplicationPacket(createApplicationPacket(listing, baselineResume));
+  async function prepareApplication(listing: MatchedListing) {
+    setPacketStatus("loading");
+    setApplicationPacket(createApplicationPacket(listing, baselineResume, {
+      aiStatus: "fallback",
+      generatedBy: "Preparing AI packet",
+      model: "deepseek-v4-pro",
+      aiMessage: "Calling DeepSeek packet generator..."
+    }));
+
+    try {
+      const response = await fetch("http://localhost:8787/api/application-packet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          listing,
+          baselineResume,
+          resumeProfile
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI packet endpoint returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      setApplicationPacket(createApplicationPacket(listing, baselineResume, {
+        aiStatus: payload.status || "fallback",
+        generatedBy: payload.generatedBy || "DeepSeek",
+        model: payload.model || "deepseek-v4-pro",
+        aiMessage: payload.message || "AI packet ready.",
+        packet: payload.packet
+      }));
+      setPacketStatus("ready");
+    } catch (error) {
+      setApplicationPacket(createApplicationPacket(listing, baselineResume, {
+        aiStatus: "error",
+        generatedBy: "Template fallback",
+        model: "deepseek-v4-pro",
+        aiMessage: error instanceof Error ? error.message : "Unable to reach DeepSeek packet endpoint."
+      }));
+      setPacketStatus("error");
+    }
   }
 
   function upsertApplication(application: Application) {
@@ -1403,6 +1452,13 @@ function App() {
                   </div>
                   <span className="progress-pill">{applicationPacket.listing.fit}% match</span>
                 </div>
+                <div className={`ai-status ${applicationPacket.aiStatus}`}>
+                  <Sparkles size={17} />
+                  <span>
+                    {packetStatus === "loading" ? "Generating with DeepSeek..." : `${applicationPacket.generatedBy} · ${applicationPacket.model}`}
+                    {" "}— {applicationPacket.aiMessage}
+                  </span>
+                </div>
                 <div className="packet-grid">
                   <article>
                     <strong>Verification</strong>
@@ -1423,6 +1479,18 @@ function App() {
                     <ul>
                       {applicationPacket.talkingPoints.map((item) => (
                         <li key={`talk-${item}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                  <article>
+                    <strong>Fit summary</strong>
+                    <span>{applicationPacket.fitSummary}</span>
+                  </article>
+                  <article>
+                    <strong>Approval warnings</strong>
+                    <ul>
+                      {applicationPacket.reviewWarnings.map((item) => (
+                        <li key={`warning-${item}`}>{item}</li>
                       ))}
                     </ul>
                   </article>
@@ -2047,7 +2115,17 @@ function getMatchedListings(profile: ResumeProfile, sourceListings: Listing[] = 
     .slice(0, 500);
 }
 
-function createApplicationPacket(listing: MatchedListing, baseline: BaselineResume): ApplicationPacket {
+function createApplicationPacket(
+  listing: MatchedListing,
+  baseline: BaselineResume,
+  aiResult?: {
+    aiStatus?: "ok" | "missing_key" | "fallback" | "error";
+    generatedBy?: string;
+    model?: string;
+    aiMessage?: string;
+    packet?: Partial<Pick<ApplicationPacket, "resumeFocus" | "coverNote" | "talkingPoints" | "commonAnswers" | "reviewWarnings" | "fitSummary">>;
+  }
+): ApplicationPacket {
   const matchedTerms = listing.matchedTerms.slice(0, 5);
   const resumeFocus = matchedTerms.length > 0
     ? matchedTerms.map((term) => `Emphasize ${term} in the role summary and bullets.`)
@@ -2064,12 +2142,32 @@ function createApplicationPacket(listing: MatchedListing, baseline: BaselineResu
     "Work authorization: answer only with Eric's reviewed and approved wording."
   ];
 
-  return {
+  const fallbackPacket = {
     listing,
     resumeFocus,
     talkingPoints,
     commonAnswers,
-    coverNote: `I am interested in the ${listing.role} opportunity at ${listing.company}. My finance coursework, investment research work, and experience with ${matchedTerms.slice(0, 3).join(", ") || "financial analysis"} position me to contribute quickly while continuing to grow through a rigorous internship experience.`
+    coverNote: `I am interested in the ${listing.role} opportunity at ${listing.company}. My finance coursework, investment research work, and experience with ${matchedTerms.slice(0, 3).join(", ") || "financial analysis"} position me to contribute quickly while continuing to grow through a rigorous internship experience.`,
+    reviewWarnings: [
+      "Student approval required before submitting anything.",
+      "Verify the application link and company career page before applying."
+    ],
+    fitSummary: `${listing.company} matches Eric through ${matchedTerms.slice(0, 4).join(", ") || "finance internship signals"}.`
+  };
+  const packet = aiResult?.packet || {};
+
+  return {
+    listing,
+    resumeFocus: Array.isArray(packet.resumeFocus) ? packet.resumeFocus : fallbackPacket.resumeFocus,
+    talkingPoints: Array.isArray(packet.talkingPoints) ? packet.talkingPoints : fallbackPacket.talkingPoints,
+    commonAnswers: Array.isArray(packet.commonAnswers) ? packet.commonAnswers : fallbackPacket.commonAnswers,
+    reviewWarnings: Array.isArray(packet.reviewWarnings) ? packet.reviewWarnings : fallbackPacket.reviewWarnings,
+    fitSummary: typeof packet.fitSummary === "string" ? packet.fitSummary : fallbackPacket.fitSummary,
+    coverNote: typeof packet.coverNote === "string" ? packet.coverNote : fallbackPacket.coverNote,
+    generatedBy: aiResult?.generatedBy || "Template fallback",
+    model: aiResult?.model || "deepseek-v4-pro",
+    aiStatus: aiResult?.aiStatus || "missing_key",
+    aiMessage: aiResult?.aiMessage || "Add DEEPSEEK_API_KEY to enable live AI generation."
   };
 }
 
