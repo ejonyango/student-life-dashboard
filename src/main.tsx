@@ -2782,6 +2782,11 @@ function App() {
         </section>
 
         <section className={`panel applications-page ${currentPage === "applications" ? "" : "hidden-page"}`} id="applications">
+          <div className="campus-ribbon">
+            <span>Loyola Chicago</span>
+            <strong>Internship pipeline</strong>
+            <span>Chicago-ready</span>
+          </div>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Pipeline</p>
