@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import {
   BookOpen,
   Bot,
@@ -27,6 +29,8 @@ import {
   UserRoundCheck
 } from "lucide-react";
 import "./styles.css";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 type Application = {
   company: string;
@@ -82,70 +86,105 @@ type MatchedListing = Listing & {
 };
 
 const defaultResumeProfile: ResumeProfile = {
-  fileName: "Sample resume profile",
+  fileName: "Eric Onyango Resume.pdf",
   text:
-    "Business Analytics major with coursework in Econometrics and Data Structures. Skills include Python, Excel, SQL, data analysis, research, presentation, business writing, and project management. Experience includes analytics project, campus project, customer research, and leadership.",
-  skills: ["python", "excel", "sql", "data analysis", "research", "presentation", "business writing", "project management"],
-  experience: ["analytics project", "campus project", "customer research", "leadership"],
-  major: "business analytics",
-  keywords: ["Chicago", "internship"]
+    "Eric Onyango is a Loyola University Chicago Quinlan School of Business student pursuing a BBA in Finance with minors in Accounting, Information Systems, and Environmental Economics and Sustainability. Skills include Excel, PowerPoint, SQL, Refinitiv Eikon, Grata, valuation, financial modeling, capital markets, treasury, investment research, private placement, M&A, due diligence, market mapping, and financial statements. Experience includes Incoming Finance Intern on Exelon Business Services Treasury and Capital Markets Team, Renewable Advisors Winter Analyst, Project Destined Real Estate Private Equity Intern, Hevesta Capital Search Fund Intern, Rambler Investment Fund analyst, and NABA Treasurer.",
+  skills: [
+    "excel",
+    "powerpoint",
+    "sql",
+    "refinitiv eikon",
+    "grata",
+    "valuation",
+    "financial modeling",
+    "capital markets",
+    "treasury",
+    "investment research",
+    "private placement",
+    "m&a",
+    "due diligence",
+    "market mapping",
+    "financial statements",
+    "accounting"
+  ],
+  experience: [
+    "finance intern",
+    "winter analyst",
+    "real estate private equity",
+    "search fund intern",
+    "investment fund analyst",
+    "capital raising",
+    "investor presentations",
+    "acquisition sourcing",
+    "treasurer"
+  ],
+  major: "finance",
+  keywords: ["Chicago", "finance internship", "capital markets", "investment banking"]
 };
 
 const applications: Application[] = [
   {
-    company: "Morningstar",
-    role: "Data Analyst Intern",
+    company: "Exelon",
+    role: "Finance Intern - Treasury and Capital Markets",
     status: "Interview",
-    next: "Prep behavioral answers by Tuesday",
+    next: "Prepare treasury, capital markets, and renewable energy talking points",
+    fit: 96
+  },
+  {
+    company: "William Blair",
+    role: "Investment Banking Summer Analyst",
+    status: "Applied",
+    next: "Follow up with Chicago analyst contact after resume review",
     fit: 92
   },
   {
-    company: "Abbott",
-    role: "Product Operations Intern",
-    status: "Applied",
-    next: "Follow up with campus recruiter",
-    fit: 86
-  },
-  {
-    company: "United Airlines",
-    role: "Digital Strategy Intern",
+    company: "JPMorgan Chase",
+    role: "Corporate & Investment Bank Summer Analyst",
     status: "Drafting",
-    next: "Tailor resume for analytics projects",
-    fit: 79
+    next: "Tailor resume around private placement and M&A transaction research",
+    fit: 90
   },
   {
     company: "CME Group",
-    role: "Technology Summer Analyst",
+    role: "Finance & Risk Summer Analyst",
     status: "Follow-up",
-    next: "Send short note after info session",
-    fit: 84
+    next: "Send note referencing Rambler Investment Fund markets experience",
+    fit: 88
   }
 ];
 
 const initialCourses: Lesson[] = [
   {
-    course: "ECON 304: Econometrics",
+    course: "ECON 303: Intermediate Microeconomics",
     time: "9:30 AM",
-    task: "Problem set due tonight",
+    task: "Review market structure and elasticity notes",
     intensity: "High",
     professor: "Dr. Keller",
     location: "Schreiber Center"
   },
   {
-    course: "COMP 271: Data Structures",
+    course: "ACCT 303: Intermediate Accounting I",
     time: "12:10 PM",
-    task: "Review graph traversal notes",
+    task: "Practice financial statement adjustments",
     intensity: "Medium",
     professor: "Prof. Nair",
     location: "Cudahy Science Hall"
   },
   {
-    course: "COMM 215: Business Writing",
+    course: "INFS 346: Database Systems",
     time: "2:45 PM",
-    task: "Resume workshop reflection",
+    task: "SQL schema assignment",
     intensity: "Low",
     professor: "Prof. Alvarez",
     location: "Damen Student Center"
+  },
+  {
+    course: "ISSCM 241: Business Statistics",
+    time: "4:15 PM",
+    task: "Regression and probability review",
+    intensity: "Medium",
+    professor: "Prof. Chen",
+    location: "Quinlan School of Business"
   }
 ];
 
@@ -153,25 +192,25 @@ const agents: Agent[] = [
   {
     name: "Email Agent",
     state: "Needs approval",
-    detail: "Drafted 2 recruiter replies and found 1 interview request.",
+    detail: "Watching recruiter threads for Exelon, banking, search fund, and markets opportunities.",
     icon: <Inbox size={18} />
   },
   {
     name: "Calendar Agent",
     state: "Synced",
-    detail: "Balanced classes, assignments, and interview prep blocks.",
+    detail: "Balances Quinlan coursework with interview prep and investment fund commitments.",
     icon: <CalendarDays size={18} />
   },
   {
     name: "Resume Agent",
     state: "Ready",
-    detail: "Suggested 3 bullets for analytics roles from recent coursework.",
+    detail: "Prioritizes finance, capital markets, private placement, and valuation language.",
     icon: <FileText size={18} />
   },
   {
-    name: "Social Agent",
+    name: "Network Agent",
     state: "Drafting",
-    detail: "Prepared a LinkedIn update about the campus data project.",
+    detail: "Prepares outreach for Rambler alumni, NABA contacts, and Chicago finance professionals.",
     icon: <Linkedin size={18} />
   }
 ];
@@ -179,107 +218,107 @@ const agents: Agent[] = [
 const listings: Listing[] = [
   {
     company: "Morningstar",
-    role: "Summer Intern - Data & Analytics",
+    role: "Summer Intern - Investment Research",
     location: "Chicago, IL",
     sourceBoard: "LinkedIn",
-    sourceDescription: "Internship focused on research, data analysis, and business problem solving.",
+    sourceDescription: "Internship focused on investment research, financial analysis, and market problem solving.",
     companyVerification: "Company careers page checked before adding.",
     applicationLink: "https://www.morningstar.com/company/careers",
     verifiedDate: "May 10, 2026",
-    skills: ["data analysis", "excel", "python", "statistics", "research"],
-    experienceSignals: ["analytics project", "business problem solving", "presentation"],
-    majors: ["business analytics", "economics", "computer science", "finance"]
+    skills: ["investment research", "financial statements", "excel", "valuation", "capital markets"],
+    experienceSignals: ["investment fund analyst", "financial analysis", "investor presentations"],
+    majors: ["finance", "economics", "accounting"]
   },
   {
-    company: "Abbott",
-    role: "Commercial Leadership Intern",
-    location: "Abbott Park, IL",
+    company: "Exelon",
+    role: "Finance Intern - Treasury & Capital Markets",
+    location: "Chicago, IL",
     sourceBoard: "Indeed",
-    sourceDescription: "Cross-functional internship supporting business projects, analysis, and presentation work.",
+    sourceDescription: "Finance internship aligned with treasury, capital markets, forecasting, and corporate finance work.",
     companyVerification: "Company careers page checked before adding.",
-    applicationLink: "https://www.jobs.abbott/us/en/internships",
+    applicationLink: "https://jobs.exeloncorp.com/",
     verifiedDate: "May 10, 2026",
-    skills: ["excel", "presentation", "operations", "market research", "project management"],
-    experienceSignals: ["leadership", "cross-functional project", "business writing"],
-    majors: ["business", "marketing", "economics", "management"]
+    skills: ["treasury", "capital markets", "excel", "financial modeling", "powerpoint"],
+    experienceSignals: ["finance intern", "capital raising", "investor presentations"],
+    majors: ["finance", "accounting", "economics"]
   },
   {
-    company: "United Airlines",
-    role: "Digital Technology Intern",
+    company: "William Blair",
+    role: "Investment Banking Summer Analyst",
     location: "Chicago, IL",
     sourceBoard: "Handshake",
-    sourceDescription: "Technology internship for students interested in product, systems, and analytics work.",
+    sourceDescription: "Analyst internship involving financial analysis, valuation, client materials, and transaction execution support.",
     companyVerification: "Company careers page checked before adding.",
-    applicationLink: "https://careers.united.com/us/en/student-and-graduate-opportunities",
+    applicationLink: "https://www.williamblair.com/Careers",
     verifiedDate: "May 10, 2026",
-    skills: ["data analysis", "product", "systems", "sql", "technology"],
-    experienceSignals: ["digital project", "analytics project", "customer research"],
-    majors: ["computer science", "information systems", "business analytics"]
+    skills: ["valuation", "financial modeling", "m&a", "powerpoint", "financial statements"],
+    experienceSignals: ["winter analyst", "private placement", "investor presentations", "capital raising"],
+    majors: ["finance", "accounting", "economics"]
   },
   {
     company: "CME Group",
-    role: "Technology Summer Analyst",
+    role: "Finance & Risk Summer Analyst",
     location: "Chicago, IL",
     sourceBoard: "LinkedIn",
-    sourceDescription: "Internship supporting financial technology teams through software, data, and market systems work.",
+    sourceDescription: "Analyst internship supporting financial markets, risk, clearing, and data-driven business analysis.",
     companyVerification: "Company careers page checked before adding.",
     applicationLink: "https://www.cmegroup.com/careers.html",
     verifiedDate: "May 10, 2026",
-    skills: ["python", "sql", "finance", "data structures", "problem solving"],
-    experienceSignals: ["coding project", "market research", "technical coursework"],
-    majors: ["computer science", "finance", "economics"]
+    skills: ["capital markets", "sql", "finance", "risk analysis", "financial statements"],
+    experienceSignals: ["investment fund analyst", "market research", "technical coursework"],
+    majors: ["finance", "economics", "information systems"]
   },
   {
-    company: "NielsenIQ",
-    role: "Consumer Insights Intern",
+    company: "Bank of America",
+    role: "Global Markets Summer Analyst",
     location: "Chicago, IL",
     sourceBoard: "Indeed",
-    sourceDescription: "Research internship involving consumer data, storytelling, and client-facing insight development.",
+    sourceDescription: "Markets internship involving capital markets, client analysis, financial products, and presentation work.",
     companyVerification: "Company careers page checked before adding.",
-    applicationLink: "https://nielseniq.com/global/en/careers/",
+    applicationLink: "https://careers.bankofamerica.com/",
     verifiedDate: "May 10, 2026",
-    skills: ["research", "data visualization", "excel", "presentation", "statistics"],
-    experienceSignals: ["research project", "business writing", "client presentation"],
-    majors: ["marketing", "business analytics", "economics", "communication"]
+    skills: ["capital markets", "excel", "powerpoint", "investment research", "financial modeling"],
+    experienceSignals: ["investor presentations", "investment fund analyst", "market research"],
+    majors: ["finance", "economics", "accounting"]
   },
   {
-    company: "Relativity",
-    role: "Product Management Intern",
+    company: "JPMorgan Chase",
+    role: "Corporate & Investment Bank Summer Analyst",
     location: "Chicago, IL",
     sourceBoard: "Handshake",
-    sourceDescription: "Internship focused on product discovery, user problems, technical teams, and launch support.",
+    sourceDescription: "Finance internship supporting client analysis, transaction materials, valuation, and banking execution.",
     companyVerification: "Company careers page checked before adding.",
-    applicationLink: "https://www.relativity.com/company/careers/",
+    applicationLink: "https://careers.jpmorgan.com/",
     verifiedDate: "May 10, 2026",
-    skills: ["product", "user research", "communication", "data analysis", "project management"],
-    experienceSignals: ["campus project", "customer research", "technical collaboration"],
-    majors: ["business", "computer science", "information systems", "communication"]
+    skills: ["valuation", "financial modeling", "m&a", "capital markets", "excel"],
+    experienceSignals: ["winter analyst", "capital raising", "private placement", "investor presentations"],
+    majors: ["finance", "accounting", "economics"]
   },
   {
-    company: "Motorola Solutions",
-    role: "Software Engineering Intern",
+    company: "RSM",
+    role: "Transaction Advisory Intern",
     location: "Chicago, IL",
     sourceBoard: "Company Careers",
-    sourceDescription: "Engineering internship for students building software, APIs, and reliable technology products.",
+    sourceDescription: "Internship focused on diligence, financial analysis, accounting quality, and transaction advisory support.",
     companyVerification: "Company careers page checked before adding.",
-    applicationLink: "https://motorolasolutions.wd5.myworkdayjobs.com/Careers",
+    applicationLink: "https://rsmus.com/careers.html",
     verifiedDate: "May 10, 2026",
-    skills: ["java", "python", "data structures", "apis", "testing"],
-    experienceSignals: ["coding project", "technical coursework", "software project"],
-    majors: ["computer science", "software engineering", "information systems"]
+    skills: ["due diligence", "accounting", "financial statements", "excel", "valuation"],
+    experienceSignals: ["search fund intern", "ownership structures", "preliminary diligence"],
+    majors: ["accounting", "finance", "economics"]
   },
   {
-    company: "Kraft Heinz",
-    role: "Marketing Analytics Intern",
+    company: "Deloitte",
+    role: "Discovery Intern - Financial Advisory",
     location: "Chicago, IL",
     sourceBoard: "LinkedIn",
-    sourceDescription: "Internship using data, market research, and communication skills to support brand decisions.",
+    sourceDescription: "Internship introducing advisory work across finance, accounting, business analysis, and client service.",
     companyVerification: "Company careers page checked before adding.",
-    applicationLink: "https://careers.kraftheinz.com/",
+    applicationLink: "https://www.deloitte.com/us/en/careers.html",
     verifiedDate: "May 10, 2026",
-    skills: ["market research", "excel", "data analysis", "presentation", "storytelling"],
-    experienceSignals: ["business writing", "research project", "campus leadership"],
-    majors: ["marketing", "business analytics", "business", "communication"]
+    skills: ["accounting", "financial statements", "excel", "powerpoint", "due diligence"],
+    experienceSignals: ["treasurer", "business writing", "investment fund analyst"],
+    majors: ["accounting", "finance", "business"]
   }
 ];
 
@@ -288,6 +327,9 @@ const skillDictionary = [
   "java",
   "sql",
   "excel",
+  "powerpoint",
+  "refinitiv eikon",
+  "grata",
   "data analysis",
   "statistics",
   "research",
@@ -305,7 +347,21 @@ const skillDictionary = [
   "testing",
   "storytelling",
   "business writing",
-  "technology"
+  "technology",
+  "valuation",
+  "financial modeling",
+  "3-statement modeling",
+  "capital markets",
+  "treasury",
+  "investment research",
+  "private placement",
+  "m&a",
+  "due diligence",
+  "market mapping",
+  "financial statements",
+  "accounting",
+  "risk analysis",
+  "finance"
 ];
 
 const experienceDictionary = [
@@ -322,6 +378,19 @@ const experienceDictionary = [
   "cross-functional project",
   "market research",
   "campus leadership"
+  ,"finance intern",
+  "winter analyst",
+  "real estate private equity",
+  "search fund intern",
+  "investment fund analyst",
+  "capital raising",
+  "investor presentations",
+  "acquisition sourcing",
+  "treasurer",
+  "ownership structures",
+  "preliminary diligence",
+  "financial analysis",
+  "technical coursework"
 ];
 
 const majorDictionary = [
@@ -334,7 +403,10 @@ const majorDictionary = [
   "management",
   "communication",
   "information systems",
-  "software engineering"
+  "software engineering",
+  "accounting",
+  "environmental economics",
+  "sustainability"
 ];
 
 const statusClass: Record<Application["status"], string> = {
@@ -404,7 +476,9 @@ function App() {
       return;
     }
 
-    const text = await file.text();
+    const text = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+      ? await extractPdfText(file)
+      : await file.text();
     const parsed = parseResume(text, file.name, resumeProfile.keywords);
     setResumeProfile(parsed);
   }
@@ -425,8 +499,8 @@ function App() {
             <GraduationCap size={24} />
           </div>
           <div>
-            <strong>Student Life OS</strong>
-            <span>Loyola Chicago</span>
+            <strong>Eric Onyango OS</strong>
+            <span>Finance · Loyola Chicago</span>
           </div>
         </div>
 
@@ -467,7 +541,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Monday, May 11</p>
-            <h1>Resume-driven dashboard</h1>
+            <h1>Eric’s finance dashboard</h1>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" title="Sync connected accounts">
@@ -481,15 +555,15 @@ function App() {
 
         <section className="hero-panel" id="dashboard">
           <div>
-            <p className="eyebrow">Single-student profile</p>
+              <p className="eyebrow">Eric Onyango profile</p>
             <h2>
               {resumeProfile.major
                 ? `${capitalizeWords(resumeProfile.major)} resume is driving every internship recommendation.`
                 : "Upload the student resume to drive every internship recommendation."}
             </h2>
             <p>
-              Skills, experience signals, major or field of study, and added keywords are saved
-              as the profile memory for this student and used to filter Available Listings.
+              Eric’s BBA Finance profile, accounting and information systems minors, capital
+              markets experience, and investment research signals drive every listing and task.
             </p>
           </div>
           <div className="briefing-stack">
@@ -500,7 +574,7 @@ function App() {
             </div>
             <div>
               <Clock3 size={18} />
-              <span>Matching rule</span>
+              <span>Finance focus</span>
               <strong>At least 2 resume correlations per listing</strong>
             </div>
           </div>
@@ -521,16 +595,16 @@ function App() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Resume inbox</p>
-              <h3>Resume-driven matching</h3>
+              <h3>Eric’s resume memory</h3>
             </div>
             <span className="progress-pill">{resumeProfile.skills.length} saved skills</span>
           </div>
           <div className="resume-grid">
             <label className="upload-box">
               <FileText size={22} />
-              <strong>Upload resume text</strong>
-              <span>Upload a text or markdown resume for this MVP.</span>
-              <input type="file" accept=".txt,.md,.text" onChange={handleResumeUpload} />
+              <strong>Upload Eric’s latest resume</strong>
+              <span>Upload a PDF, text, or markdown resume.</span>
+              <input type="file" accept=".pdf,.txt,.md,.text" onChange={handleResumeUpload} />
             </label>
             <div className="resume-summary">
               <span>Current resume</span>
@@ -549,7 +623,7 @@ function App() {
                 <textarea
                   value={keywordInput}
                   onChange={(event) => setKeywordInput(event.target.value)}
-                  placeholder="Chicago, product analytics, healthcare, fintech"
+                placeholder="Chicago, investment banking, treasury, capital markets"
                 />
               </label>
               <button className="primary-button" type="button" onClick={saveKeywords}>
@@ -614,7 +688,7 @@ function App() {
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Pipeline</p>
-                <h3>Internship applications</h3>
+              <h3>Eric’s internship pipeline</h3>
               </div>
               <button className="ghost-button">View all</button>
             </div>
@@ -640,8 +714,8 @@ function App() {
           <div className="panel dashboard-courses">
             <div className="panel-header">
               <div>
-                <p className="eyebrow">Dashboard courses</p>
-                <h3>Lessons and assignments</h3>
+                <p className="eyebrow">Quinlan courses</p>
+                <h3>Finance coursework</h3>
               </div>
               <span className="progress-pill">{weeklyProgress}% planned</span>
             </div>
@@ -667,7 +741,7 @@ function App() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">School</p>
-              <h3>Editable course planner</h3>
+              <h3>Eric’s course planner</h3>
             </div>
             <span className="progress-pill">{courseList.length} courses</span>
           </div>
@@ -766,7 +840,7 @@ function App() {
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Autopilot</p>
-                <h3>Agents</h3>
+                <h3>Eric’s agents</h3>
               </div>
             </div>
             <div className="agent-list">
@@ -787,7 +861,7 @@ function App() {
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Resume</p>
-                <h3>Saved profile</h3>
+                <h3>Finance profile</h3>
               </div>
               <FileText size={20} />
             </div>
@@ -805,14 +879,14 @@ function App() {
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Presence</p>
-                <h3>Social and network</h3>
+                <h3>Eric’s network</h3>
               </div>
               <Linkedin size={20} />
             </div>
             <div className="social-list">
-              <SocialItem icon={<UserRoundCheck size={17} />} label="LinkedIn profile" value="82% complete" />
-              <SocialItem icon={<MessageSquareText size={17} />} label="Post draft" value="Campus project update" />
-              <SocialItem icon={<MailCheck size={17} />} label="Outreach" value="3 follow-ups queued" />
+              <SocialItem icon={<UserRoundCheck size={17} />} label="LinkedIn profile" value="Finance analyst positioning" />
+              <SocialItem icon={<MessageSquareText size={17} />} label="Post draft" value="Rambler Investment Fund insight" />
+              <SocialItem icon={<MailCheck size={17} />} label="Outreach" value="Banking and capital markets contacts" />
             </div>
           </div>
         </section>
@@ -824,10 +898,29 @@ function App() {
 function loadResumeProfile(): ResumeProfile {
   try {
     const storedProfile = window.localStorage.getItem("student-life.resume-profile");
-    return storedProfile ? { ...defaultResumeProfile, ...JSON.parse(storedProfile) } : defaultResumeProfile;
+    if (!storedProfile) {
+      return defaultResumeProfile;
+    }
+
+    const parsedProfile = { ...defaultResumeProfile, ...JSON.parse(storedProfile) };
+    return parsedProfile.fileName === "Sample resume profile" ? defaultResumeProfile : parsedProfile;
   } catch {
     return defaultResumeProfile;
   }
+}
+
+async function extractPdfText(file: File) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pages = await Promise.all(
+    Array.from({ length: pdf.numPages }, async (_, index) => {
+      const page = await pdf.getPage(index + 1);
+      const content = await page.getTextContent();
+      return content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
+    })
+  );
+
+  return pages.join("\n");
 }
 
 function parseResume(text: string, fileName: string, keywords: string[]): ResumeProfile {
