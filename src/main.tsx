@@ -79,6 +79,14 @@ type ResumeProfile = {
   keywords: string[];
 };
 
+type BaselineResume = {
+  status: "Draft" | "Approved";
+  updatedAt: string;
+  headline: string;
+  summary: string;
+  bullets: string[];
+};
+
 type MatchedListing = Listing & {
   matchCount: number;
   matchedTerms: string[];
@@ -120,6 +128,20 @@ const defaultResumeProfile: ResumeProfile = {
   ],
   major: "finance",
   keywords: ["Chicago", "finance internship", "capital markets", "investment banking"]
+};
+
+const initialBaselineResume: BaselineResume = {
+  status: "Draft",
+  updatedAt: "May 11, 2026",
+  headline: "Finance student focused on capital markets, valuation, and investment research",
+  summary:
+    "Loyola University Chicago BBA Finance student with accounting and information systems depth, hands-on investment research, private placement support, real estate private equity underwriting, search fund sourcing, and capital markets preparation.",
+  bullets: [
+    "Supported capital raising materials and investor presentation workstreams for sustainability-focused private placement mandates.",
+    "Researched private placement and M&A transactions across climate, infrastructure, and energy transition sectors.",
+    "Underwrote multifamily investments and analyzed ownership structures, valuation benchmarks, and acquisition leads.",
+    "Evaluated public equities using valuation, catalysts, macro trends, filings, financial statements, cash flow models, and Refinitiv Eikon."
+  ]
 };
 
 const applications: Application[] = [
@@ -428,6 +450,7 @@ function App() {
     location: ""
   });
   const [resumeProfile, setResumeProfile] = useState<ResumeProfile>(() => loadResumeProfile());
+  const [baselineResume, setBaselineResume] = useState<BaselineResume>(() => loadBaselineResume());
   const [keywordInput, setKeywordInput] = useState("Chicago, internship");
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -443,6 +466,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem("student-life.resume-profile", JSON.stringify(resumeProfile));
   }, [resumeProfile]);
+
+  useEffect(() => {
+    window.localStorage.setItem("student-life.baseline-resume", JSON.stringify(baselineResume));
+  }, [baselineResume]);
 
   function addCourse(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -481,6 +508,7 @@ function App() {
       : await file.text();
     const parsed = parseResume(text, file.name, resumeProfile.keywords);
     setResumeProfile(parsed);
+    setBaselineResume(createBaselineResume(parsed));
   }
 
   function saveKeywords() {
@@ -541,7 +569,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Monday, May 11</p>
-            <h1>Eric’s finance dashboard</h1>
+            <h1>Eric’s Dashboard</h1>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" title="Sync connected accounts">
@@ -583,6 +611,7 @@ function App() {
         <section className="metric-grid" aria-label="Student life metrics">
           <Metric label="Resume skills" value={String(resumeProfile.skills.length)} detail="Saved from upload" />
           <Metric label="Matched listings" value={String(matchedListings.length)} detail="500 result cap" />
+          <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
           <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
           <Metric
             label="Courses tracked"
@@ -615,6 +644,43 @@ function App() {
                 {resumeProfile.skills.slice(0, 10).map((skill) => (
                   <span key={skill}>{skill}</span>
                 ))}
+              </div>
+            </div>
+            <div className="baseline-card">
+              <div className="baseline-topline">
+                <span>AI baseline resume</span>
+                <strong className={baselineResume.status === "Approved" ? "approved" : ""}>
+                  {baselineResume.status}
+                </strong>
+              </div>
+              <h4>{baselineResume.headline}</h4>
+              <p>{baselineResume.summary}</p>
+              <ul>
+                {baselineResume.bullets.slice(0, 4).map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+              <div className="baseline-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() =>
+                    setBaselineResume((currentBaseline) => ({
+                      ...currentBaseline,
+                      status: "Approved",
+                      updatedAt: "May 11, 2026"
+                    }))
+                  }
+                >
+                  <CheckCircle2 size={16} /> Approve baseline
+                </button>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => setBaselineResume(createBaselineResume(resumeProfile))}
+                >
+                  <Sparkles size={16} /> Regenerate draft
+                </button>
               </div>
             </div>
             <div className="keyword-box">
@@ -660,6 +726,9 @@ function App() {
                   {listing.company} · {listing.location}
                 </p>
                 <p>{listing.sourceDescription}</p>
+                <p className="tailoring-note">
+                  AI will tailor Eric’s approved baseline resume toward {listing.role} before application submission.
+                </p>
                 <div className="verified-line">
                   <ShieldCheck size={16} />
                   <span>{listing.companyVerification} · {listing.verifiedDate}</span>
@@ -670,7 +739,7 @@ function App() {
                   ))}
                 </div>
                 <a className="application-link" href={listing.applicationLink} target="_blank" rel="noreferrer">
-                  Open application <ExternalLink size={16} />
+                  Prepare application <ExternalLink size={16} />
                 </a>
               </article>
             ))}
@@ -871,7 +940,7 @@ function App() {
               <p>{resumeProfile.experience.slice(0, 3).join(", ") || "Add experience through the resume upload."}</p>
             </div>
             <button className="wide-action">
-              Generate targeted version <ChevronRight size={18} />
+              Generate job-specific version <ChevronRight size={18} />
             </button>
           </div>
 
@@ -888,6 +957,37 @@ function App() {
               <SocialItem icon={<MessageSquareText size={17} />} label="Post draft" value="Rambler Investment Fund insight" />
               <SocialItem icon={<MailCheck size={17} />} label="Outreach" value="Banking and capital markets contacts" />
             </div>
+          </div>
+        </section>
+
+        <section className="panel class-integration">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Registered classes</p>
+              <h3>LOCUS and Sakai connection</h3>
+            </div>
+            <span className="progress-pill">Authorization needed</span>
+          </div>
+          <div className="integration-grid">
+            <article>
+              <strong>LOCUS schedule</strong>
+              <span>Authoritative source for Eric’s registered semester classes.</span>
+            </article>
+            <article>
+              <strong>Sakai course sites</strong>
+              <span>LMS source for assignments, syllabi, announcements, and course materials.</span>
+            </article>
+            <article>
+              <strong>Fallback import</strong>
+              <span>Eric can upload/export his class schedule while direct access is being configured.</span>
+            </article>
+          </div>
+          <div className="planner-card">
+            <ShieldCheck size={18} />
+            <span>
+              Because registration records are protected student data, Eric should authorize access.
+              We can connect through official login/export options first, then automate sync where allowed.
+            </span>
           </div>
         </section>
       </section>
@@ -907,6 +1007,31 @@ function loadResumeProfile(): ResumeProfile {
   } catch {
     return defaultResumeProfile;
   }
+}
+
+function loadBaselineResume(): BaselineResume {
+  try {
+    const storedBaseline = window.localStorage.getItem("student-life.baseline-resume");
+    return storedBaseline ? { ...initialBaselineResume, ...JSON.parse(storedBaseline) } : initialBaselineResume;
+  } catch {
+    return initialBaselineResume;
+  }
+}
+
+function createBaselineResume(profile: ResumeProfile): BaselineResume {
+  const skills = profile.skills.slice(0, 6).join(", ");
+  const experience = profile.experience.slice(0, 4);
+
+  return {
+    status: "Draft",
+    updatedAt: "May 11, 2026",
+    headline: `${capitalizeWords(profile.major || "Finance")} student focused on ${skills || "career-aligned internship roles"}`,
+    summary:
+      "AI-assisted baseline drafted from Eric's current resume. It is intended to be reviewed and approved before any automated application or job-specific tailoring workflow uses it.",
+    bullets: experience.length
+      ? experience.map((signal) => `Position experience around ${signal} for finance, advisory, and capital markets internship applications.`)
+      : initialBaselineResume.bullets
+  };
 }
 
 async function extractPdfText(file: File) {
