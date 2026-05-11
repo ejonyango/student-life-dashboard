@@ -211,6 +211,13 @@ type ClassNote = {
   tags: string[];
 };
 
+type CalendarDueDay = {
+  date: Date;
+  dateKey: string;
+  inMonth: boolean;
+  assignments: AssignmentTask[];
+};
+
 type ApplicationPacket = {
   listing: MatchedListing;
   resumeFocus: string[];
@@ -230,6 +237,7 @@ type Page =
   | "available-listings"
   | "applications"
   | "school"
+  | "calendar"
   | "agents"
   | "advisor"
   | "social"
@@ -867,6 +875,7 @@ const pageTitles: Record<Page, string> = {
   "available-listings": "Available Listings",
   applications: "Applications",
   school: "School",
+  calendar: "Due Calendar",
   agents: "Agents",
   advisor: "Advisor",
   social: "Network",
@@ -910,6 +919,7 @@ function App() {
   const [advisorStatus, setAdvisorStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [notebookPacket, setNotebookPacket] = useState("");
   const [assignmentTasks, setAssignmentTasks] = useState<AssignmentTask[]>([]);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [classNotes, setClassNotes] = useState<ClassNote[]>([]);
   const [assignmentForm, setAssignmentForm] = useState<AssignmentTask>({
     courseName: "",
@@ -941,6 +951,17 @@ function App() {
   const completedCourseCount = academicStanding.completedCourses.length;
   const totalKnownProgramCourses = completedCourseCount + plannedCourseCount;
   const coursesLeftAfterCurrentTerm = Math.max(0, plannedCourseCount - registeredCourseCount);
+  const upcomingAssignments = getUpcomingAssignments(assignmentTasks);
+  const calendarDays = buildDueCalendar(calendarMonth, assignmentTasks);
+  const calendarMonthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const dueThisMonth = assignmentTasks.filter((assignment) => {
+    const dueDate = parseAssignmentDueDate(assignment);
+    return dueDate
+      && dueDate.getMonth() === calendarMonth.getMonth()
+      && dueDate.getFullYear() === calendarMonth.getFullYear()
+      && assignment.status !== "done"
+      && assignment.status !== "archived";
+  });
 
   useEffect(() => {
     const syncPage = () => setCurrentPage(getPageFromHash());
@@ -1841,6 +1862,10 @@ function App() {
     window.location.hash = "available-listings";
   }
 
+  function moveCalendarMonth(direction: -1 | 1) {
+    setCalendarMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -1866,6 +1891,9 @@ function App() {
           </a>
           <a className={currentPage === "school" ? "active" : ""} href="#school">
             <CalendarDays size={18} /> <span>School</span>
+          </a>
+          <a className={currentPage === "calendar" ? "active" : ""} href="#calendar">
+            <Clock3 size={18} /> <span>Calendar</span>
           </a>
           <a className={currentPage === "agents" ? "active" : ""} href="#agents">
             <Bot size={18} /> <span>Agents</span>
@@ -1972,6 +2000,16 @@ function App() {
             <strong>{academicStanding.gpaLabel} {academicStanding.gpa}</strong>
             <p>{completedCourseCount} completed courses · {academicStanding.classYear}</p>
           </article>
+
+          <article className="command-card due">
+            <span>Next due</span>
+            <strong>{upcomingAssignments[0] ? upcomingAssignments[0].title : "No due dates saved"}</strong>
+            <p>
+              {upcomingAssignments[0]
+                ? `${upcomingAssignments[0].courseName} · ${formatAssignmentDue(upcomingAssignments[0])}`
+                : "Add assignments in Advisor or Calendar."}
+            </p>
+          </article>
         </section>
 
         <section className={`metric-grid compact-metrics ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Student life metrics">
@@ -1982,6 +2020,7 @@ function App() {
           <Metric label="Baseline resume" value={baselineResume.status} detail="Student approval required" />
           <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
           <Metric label="Navigate tasks" value={String(navigateTasks.length)} detail="Checklist + alerts" />
+          <Metric label="Upcoming due" value={String(upcomingAssignments.length)} detail="Saved assignment deadlines" />
           <Metric
             label="Courses tracked"
             value={String(courseList.length)}
@@ -2084,6 +2123,112 @@ function App() {
               ))}
             </div>
           </article>
+        </section>
+
+        <section className={`panel due-calendar-page ${currentPage === "calendar" ? "" : "hidden-page"}`} id="calendar">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Calendar</p>
+              <h3>Assignment and deadline calendar</h3>
+            </div>
+            <div className="panel-actions">
+              <span className="progress-pill">{upcomingAssignments.length} upcoming</span>
+              <a className="text-link" href="#advisor" onClick={() => setAdvisorTask("assignment_checkin")}>Assignment check-in</a>
+            </div>
+          </div>
+          <div className="calendar-layout">
+            <div className="calendar-board">
+              <div className="calendar-toolbar">
+                <button className="icon-button" type="button" title="Previous month" onClick={() => moveCalendarMonth(-1)}>
+                  <ChevronRight className="rotate-left" size={18} />
+                </button>
+                <strong>{calendarMonthLabel}</strong>
+                <button className="icon-button" type="button" title="Next month" onClick={() => moveCalendarMonth(1)}>
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+              <div className="calendar-weekdays" aria-hidden="true">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+              <div className="calendar-grid">
+                {calendarDays.map((day) => (
+                  <article className={`calendar-day ${day.inMonth ? "" : "muted"} ${day.assignments.length ? "has-due" : ""}`} key={day.dateKey}>
+                    <span>{day.date.getDate()}</span>
+                    <div>
+                      {day.assignments.slice(0, 3).map((assignment) => (
+                        <em className={`due-chip ${assignment.priority}`} key={`${day.dateKey}-${assignment.id || assignment.title}`}>
+                          {assignment.courseName}: {assignment.title}
+                        </em>
+                      ))}
+                      {day.assignments.length > 3 ? <em className="due-chip more">+{day.assignments.length - 3} more</em> : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <aside className="calendar-sidebar">
+              <form className="advisor-subform" onSubmit={saveAssignmentTask}>
+                <strong>Add due item</strong>
+                <input
+                  value={assignmentForm.courseName}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, courseName: event.target.value })}
+                  placeholder="Course"
+                />
+                <input
+                  value={assignmentForm.title}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, title: event.target.value })}
+                  placeholder="Assignment, exam, reading, or project"
+                />
+                <input
+                  type="datetime-local"
+                  value={assignmentForm.dueAt}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, dueAt: event.target.value })}
+                />
+                <select
+                  value={assignmentForm.priority}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, priority: event.target.value as AssignmentTask["priority"] })}
+                >
+                  <option value="low">Low priority</option>
+                  <option value="medium">Medium priority</option>
+                  <option value="high">High priority</option>
+                </select>
+                <textarea
+                  value={assignmentForm.details}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, details: event.target.value })}
+                  placeholder="Requirements, grading criteria, blockers, or estimated work"
+                />
+                <button className="primary-button" type="submit">
+                  <Save size={16} /> Save due item
+                </button>
+              </form>
+              <div className="due-list">
+                <div className="panel-header compact">
+                  <div>
+                    <p className="eyebrow">Upcoming</p>
+                    <h4>Next due items</h4>
+                  </div>
+                  <span className="progress-pill">{dueThisMonth.length} this month</span>
+                </div>
+                {upcomingAssignments.slice(0, 8).map((assignment) => (
+                  <article className="due-row" key={`due-${assignment.id || assignment.courseName}-${assignment.title}`}>
+                    <div>
+                      <strong>{assignment.title}</strong>
+                      <span>{assignment.courseName} · {formatAssignmentDue(assignment)}</span>
+                    </div>
+                    <em className={`due-chip ${assignment.priority}`}>{assignment.priority}</em>
+                  </article>
+                ))}
+                {upcomingAssignments.length === 0 ? (
+                  <div className="empty-state">
+                    <strong>No upcoming due dates.</strong>
+                    <span>Add assignments, exams, readings, or projects so Eric can see what is coming up.</span>
+                  </div>
+                ) : null}
+              </div>
+            </aside>
+          </div>
         </section>
 
         <section className={`panel resume-intake ${currentPage === "resume" ? "" : "hidden-page"}`} id="resume">
@@ -3326,6 +3471,68 @@ function AdvisorList({ title, items }: { title: string; items?: string[] }) {
 function formatNotebookSection(title: string, items?: string[]) {
   if (!items?.length) return "";
   return [`### ${title}`, ...items.map((item) => `- ${item}`)].join("\n");
+}
+
+function parseAssignmentDueDate(assignment: AssignmentTask) {
+  if (!assignment.dueAt) return null;
+  const dueDate = new Date(assignment.dueAt);
+  return Number.isNaN(dueDate.getTime()) ? null : dueDate;
+}
+
+function getDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getUpcomingAssignments(assignments: AssignmentTask[]) {
+  const now = new Date();
+  return assignments
+    .filter((assignment) => assignment.status !== "done" && assignment.status !== "archived")
+    .map((assignment) => ({ assignment, dueDate: parseAssignmentDueDate(assignment) }))
+    .filter((entry): entry is { assignment: AssignmentTask; dueDate: Date } => entry.dueDate !== null && entry.dueDate >= now)
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+    .map((entry) => entry.assignment);
+}
+
+function buildDueCalendar(monthDate: Date, assignments: AssignmentTask[]): CalendarDueDay[] {
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+
+  const assignmentsByDate = assignments.reduce<Record<string, AssignmentTask[]>>((grouped, assignment) => {
+    if (assignment.status === "done" || assignment.status === "archived") return grouped;
+    const dueDate = parseAssignmentDueDate(assignment);
+    if (!dueDate) return grouped;
+    const key = getDateKey(dueDate);
+    grouped[key] = [...(grouped[key] || []), assignment];
+    return grouped;
+  }, {});
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    const dateKey = getDateKey(date);
+    return {
+      date,
+      dateKey,
+      inMonth: date.getMonth() === monthDate.getMonth(),
+      assignments: assignmentsByDate[dateKey] || []
+    };
+  });
+}
+
+function formatAssignmentDue(assignment: AssignmentTask) {
+  const dueDate = parseAssignmentDueDate(assignment);
+  if (!dueDate) return "No due date";
+  return dueDate.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function ResumeDocument({ resume }: { resume: BaselineResume }) {
