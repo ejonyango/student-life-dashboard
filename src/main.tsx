@@ -1387,64 +1387,72 @@ function App() {
             ) : null}
           </div>
           {applicationPacket ? (
-            <div className="application-packet" id="application-packet" ref={applicationPacketRef}>
-              <div className="panel-header">
-                <div>
-                  <p className="eyebrow">Application packet</p>
-                  <h3>{applicationPacket.listing.role}</h3>
-                  <span>{applicationPacket.listing.company} · {applicationPacket.listing.location}</span>
+            <div
+              className="application-packet-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="application-packet-title"
+              ref={applicationPacketRef}
+            >
+              <div className="application-packet" id="application-packet">
+                <div className="panel-header">
+                  <div>
+                    <p className="eyebrow">Application packet</p>
+                    <h3 id="application-packet-title">{applicationPacket.listing.role}</h3>
+                    <span>{applicationPacket.listing.company} · {applicationPacket.listing.location}</span>
+                  </div>
+                  <span className="progress-pill">{applicationPacket.listing.fit}% match</span>
                 </div>
-                <span className="progress-pill">{applicationPacket.listing.fit}% match</span>
-              </div>
-              <div className="packet-grid">
-                <article>
-                  <strong>Verification</strong>
-                  <span>{applicationPacket.listing.companyVerification}</span>
-                  <span>Source: {applicationPacket.listing.sourceBoard}</span>
-                  <span>Checked: {applicationPacket.listing.verifiedDate}</span>
-                </article>
-                <article>
-                  <strong>Resume tailoring focus</strong>
-                  <ul>
-                    {applicationPacket.resumeFocus.map((item) => (
-                      <li key={`focus-${item}`}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-                <article>
-                  <strong>Talking points</strong>
-                  <ul>
-                    {applicationPacket.talkingPoints.map((item) => (
-                      <li key={`talk-${item}`}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-                <article>
-                  <strong>Common application answers</strong>
-                  <ul>
-                    {applicationPacket.commonAnswers.map((item) => (
-                      <li key={`answer-${item}`}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-              </div>
-              <div className="cover-note">
-                <strong>Draft cover note</strong>
-                <p>{applicationPacket.coverNote}</p>
-              </div>
-              <div className="packet-actions">
-                <button className="primary-button" type="button" onClick={saveApplicationDraft}>
-                  <Save size={16} /> Save draft
-                </button>
-                <button className="ghost-button" type="button" onClick={markApplicationApplied}>
-                  <CheckCircle2 size={16} /> Mark applied
-                </button>
-                <a className="application-link secondary" href={applicationPacket.listing.applicationLink} target="_blank" rel="noreferrer">
-                  Open application <ExternalLink size={16} />
-                </a>
-                <button className="ghost-button" type="button" onClick={() => setApplicationPacket(null)}>
-                  Close packet
-                </button>
+                <div className="packet-grid">
+                  <article>
+                    <strong>Verification</strong>
+                    <span>{applicationPacket.listing.companyVerification}</span>
+                    <span>Source: {applicationPacket.listing.sourceBoard}</span>
+                    <span>Checked: {applicationPacket.listing.verifiedDate}</span>
+                  </article>
+                  <article>
+                    <strong>Resume tailoring focus</strong>
+                    <ul>
+                      {applicationPacket.resumeFocus.map((item) => (
+                        <li key={`focus-${item}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                  <article>
+                    <strong>Talking points</strong>
+                    <ul>
+                      {applicationPacket.talkingPoints.map((item) => (
+                        <li key={`talk-${item}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                  <article>
+                    <strong>Common application answers</strong>
+                    <ul>
+                      {applicationPacket.commonAnswers.map((item) => (
+                        <li key={`answer-${item}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
+                <div className="cover-note">
+                  <strong>Draft cover note</strong>
+                  <p>{applicationPacket.coverNote}</p>
+                </div>
+                <div className="packet-actions">
+                  <button className="primary-button" type="button" onClick={saveApplicationDraft}>
+                    <Save size={16} /> Save draft
+                  </button>
+                  <button className="ghost-button" type="button" onClick={markApplicationApplied}>
+                    <CheckCircle2 size={16} /> Mark applied
+                  </button>
+                  <a className="application-link secondary" href={applicationPacket.listing.applicationLink} target="_blank" rel="noreferrer">
+                    Open application <ExternalLink size={16} />
+                  </a>
+                  <button className="ghost-button" type="button" onClick={() => setApplicationPacket(null)}>
+                    Close packet
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}

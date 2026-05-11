@@ -976,15 +976,28 @@ button {
   font-weight: 800;
 }
 
+.application-packet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-items: start;
+  padding: 36px;
+  overflow-y: auto;
+  background: rgba(11, 47, 71, 0.38);
+}
+
 .application-packet {
   display: grid;
   gap: 14px;
-  margin-top: 18px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
   padding: 18px;
   background: #ffffff;
   border: 1px solid #d8edf5;
   border-left: 4px solid #41b6e6;
   border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(11, 47, 71, 0.22);
 }
 
 .application-packet .panel-header span {
@@ -1591,5 +1604,9 @@ button.application-link {
 
   .application-row {
     grid-template-columns: 1fr;
+  }
+
+  .application-packet-overlay {
+    padding: 16px;
   }
 }
