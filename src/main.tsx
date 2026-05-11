@@ -867,6 +867,32 @@ function App() {
   }, [jobSearchState]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function syncApplicationsFromDatabase() {
+      try {
+        const response = await fetch("http://localhost:8787/api/applications");
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        if (!isMounted || !Array.isArray(payload.applications) || payload.applications.length === 0) {
+          return;
+        }
+
+        setApplicationList(payload.applications);
+      } catch {
+        // Local storage remains the startup fallback when Supabase is offline.
+      }
+    }
+
+    void syncApplicationsFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem("student-life.applications", JSON.stringify(applicationList));
   }, [applicationList]);
 

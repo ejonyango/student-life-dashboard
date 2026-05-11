@@ -147,6 +147,70 @@ function toDatabaseStatus(status = "Drafting") {
   return statuses[status] || "drafting";
 }
 
+function fromDatabaseStatus(status = "drafting") {
+  const statuses = {
+    applied: "Applied",
+    interview: "Interview",
+    drafting: "Drafting",
+    follow_up: "Follow-up",
+    offer_prep: "Offer prep"
+  };
+  return statuses[status] || "Drafting";
+}
+
+function mapApplicationRow(row) {
+  return {
+    id: row.id,
+    company: row.company,
+    role: row.role,
+    status: fromDatabaseStatus(row.status),
+    next: row.next_step || "",
+    fit: Number(row.fit || 0),
+    source: row.source || "",
+    applicationLink: row.application_link || "",
+    resumeVersion: row.resume_version || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    appliedAt: row.applied_at
+  };
+}
+
+async function listApplicationRecords() {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, database: false, applications: [], reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      select
+        applications.id,
+        applications.company,
+        applications.role,
+        applications.status,
+        applications.next_step,
+        applications.fit,
+        applications.source,
+        applications.application_link,
+        applications.created_at,
+        applications.updated_at,
+        applications.applied_at,
+        coalesce(resume_versions.status || ' baseline', '') as resume_version
+      from public.applications
+      left join public.resume_versions on resume_versions.id = applications.resume_version_id
+      join public.student_profiles on student_profiles.id = applications.student_id
+      where student_profiles.slug = 'eric-onyango'
+      order by applications.updated_at desc
+    `
+  );
+
+  return {
+    ok: true,
+    database: true,
+    applications: result.rows.map(mapApplicationRow)
+  };
+}
+
 async function saveApplicationRecord(application) {
   const pool = getDbPool();
   if (!pool) {
@@ -208,6 +272,11 @@ async function saveApplicationRecord(application) {
   );
 
   return { ok: true, saved: true, application: result.rows[0] };
+}
+
+async function handleListApplications(response) {
+  const result = await listApplicationRecords();
+  sendJson(response, 200, result);
 }
 
 async function handleSaveApplication(request, response) {
@@ -788,6 +857,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/application-packet" && request.method === "POST") {
       await handleApplicationPacket(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/applications" && request.method === "GET") {
+      await handleListApplications(response);
       return;
     }
 
