@@ -817,13 +817,7 @@ function App() {
   const [navigateItems, setNavigateItems] = useState<NavigateItem[]>([]);
   const [applicationList, setApplicationList] = useState<Application[]>(initialApplications);
   const [applicationPacket, setApplicationPacket] = useState<ApplicationPacket | null>(null);
-  const [jobSearchState, setJobSearchState] = useState<JobSearchState>({
-    status: "idle",
-    listings: [],
-    checkedAt: "",
-    query: "",
-    providerStatus: []
-  });
+  const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
   const weeklyProgress = Math.min(96, 42 + courseList.length * 9);
@@ -857,6 +851,12 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem("student-life.baseline-resume", JSON.stringify(baselineResume));
   }, [baselineResume]);
+
+  useEffect(() => {
+    if (jobSearchState.status === "success") {
+      window.localStorage.setItem("student-life.job-search", JSON.stringify(jobSearchState));
+    }
+  }, [jobSearchState]);
 
   function addCourse(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1894,6 +1894,34 @@ function loadBaselineResume(): BaselineResume {
     return storedBaseline ? { ...initialBaselineResume, ...JSON.parse(storedBaseline) } : initialBaselineResume;
   } catch {
     return initialBaselineResume;
+  }
+}
+
+function loadJobSearchState(): JobSearchState {
+  const emptyState: JobSearchState = {
+    status: "idle",
+    listings: [],
+    checkedAt: "",
+    query: "",
+    providerStatus: []
+  };
+
+  try {
+    const storedSearch = window.localStorage.getItem("student-life.job-search");
+    if (!storedSearch) {
+      return emptyState;
+    }
+
+    const parsedSearch = JSON.parse(storedSearch);
+    return {
+      ...emptyState,
+      ...parsedSearch,
+      status: parsedSearch.listings?.length ? "success" : "idle",
+      listings: Array.isArray(parsedSearch.listings) ? parsedSearch.listings : [],
+      providerStatus: Array.isArray(parsedSearch.providerStatus) ? parsedSearch.providerStatus : []
+    };
+  } catch {
+    return emptyState;
   }
 }
 
