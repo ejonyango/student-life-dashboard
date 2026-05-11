@@ -756,6 +756,9 @@ function App() {
   const highPriorityTasks = navigateTasks.filter((task) => task.priority === "High");
   const nextClass = courseList[0];
   const savedSignalCount = resumeProfile.skills.length + resumeProfile.experience.length + resumeProfile.keywords.length;
+  const registeredCourseCount = courseList.length;
+  const plannedCourseCount = navigateAcademicPlan.reduce((total, term) => total + term.courses.length, 0);
+  const coursesLeftAfterCurrentTerm = Math.max(0, plannedCourseCount - registeredCourseCount);
 
   useEffect(() => {
     const syncPage = () => setCurrentPage(getPageFromHash());
@@ -961,6 +964,11 @@ function App() {
             label="Courses tracked"
             value={String(courseList.length)}
             detail={`${highPriorityCourses} high priority`}
+          />
+          <Metric
+            label="Courses left"
+            value={String(coursesLeftAfterCurrentTerm)}
+            detail={`${plannedCourseCount} planned total`}
           />
         </section>
 
