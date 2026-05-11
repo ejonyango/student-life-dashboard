@@ -162,6 +162,16 @@ type JobSearchState = {
   error?: string;
 };
 
+type AgentAction = {
+  id: string;
+  actionType: string;
+  status: "draft" | "approved" | "sent" | "skipped" | "error";
+  subject: string;
+  body: string;
+  relatedApplicationId?: string;
+  createdAt?: string;
+};
+
 type ApplicationPacket = {
   listing: MatchedListing;
   resumeFocus: string[];
@@ -831,6 +841,9 @@ function App() {
   const [packetStatus, setPacketStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [applicationSyncStatus, setApplicationSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
   const [schoolSyncStatus, setSchoolSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
+  const [resumeSyncStatus, setResumeSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
+  const [agentSyncStatus, setAgentSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
+  const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -871,6 +884,37 @@ function App() {
       window.localStorage.setItem("student-life.job-search", JSON.stringify(jobSearchState));
     }
   }, [jobSearchState]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncAgentActionsFromDatabase() {
+      try {
+        const response = await fetch("http://localhost:8787/api/agent-actions");
+        if (!response.ok) {
+          setAgentSyncStatus("error");
+          return;
+        }
+
+        const payload = await response.json();
+        if (!isMounted || !Array.isArray(payload.actions)) {
+          setAgentSyncStatus("error");
+          return;
+        }
+
+        setAgentActions(payload.actions);
+        setAgentSyncStatus(payload.database ? "database" : "local");
+      } catch {
+        setAgentSyncStatus("local");
+      }
+    }
+
+    void syncAgentActionsFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -979,11 +1023,17 @@ function App() {
     async function syncResumeFromDatabase() {
       try {
         const response = await fetch("http://localhost:8787/api/resume-version");
-        if (!response.ok) return;
+        if (!response.ok) {
+          setResumeSyncStatus("error");
+          return;
+        }
 
         const payload = await response.json();
         const resumeVersion = payload.resumeVersion;
-        if (!isMounted || !resumeVersion) return;
+        if (!isMounted || !resumeVersion) {
+          setResumeSyncStatus(payload.database ? "database" : "local");
+          return;
+        }
 
         const baseline = resumeVersion.baseline_resume || initialBaselineResume;
         const profile: ResumeProfile = {
@@ -997,7 +1047,9 @@ function App() {
 
         setResumeProfile(profile);
         setBaselineResume({ ...initialBaselineResume, ...baseline });
+        setResumeSyncStatus(payload.database ? "database" : "local");
       } catch {
+        setResumeSyncStatus("local");
         // Local storage remains the resume fallback when Supabase is offline.
       }
     }
@@ -1138,9 +1190,81 @@ function App() {
           baselineResume: baseline
         })
       });
+      setResumeSyncStatus("database");
     } catch {
+      setResumeSyncStatus("local");
       // Local storage remains the resume fallback when the watcher/database is unavailable.
     }
+  }
+
+  async function createAgentAction(action: Pick<AgentAction, "actionType" | "subject" | "body">) {
+    const temporaryAction: AgentAction = {
+      id: `local-${Date.now()}`,
+      status: "draft",
+      ...action
+    };
+    setAgentActions((currentActions) => [temporaryAction, ...currentActions]);
+
+    try {
+      const response = await fetch("http://localhost:8787/api/agent-actions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action })
+      });
+      if (!response.ok) throw new Error(`Agent endpoint returned ${response.status}`);
+
+      const payload = await response.json();
+      if (payload.action) {
+        setAgentActions((currentActions) =>
+          currentActions.map((currentAction) =>
+            currentAction.id === temporaryAction.id ? payload.action : currentAction
+          )
+        );
+        setAgentSyncStatus("database");
+      }
+    } catch {
+      setAgentSyncStatus("local");
+    }
+  }
+
+  async function updateAgentActionStatus(action: AgentAction, status: AgentAction["status"]) {
+    const updatedAction = { ...action, status };
+    setAgentActions((currentActions) =>
+      currentActions.map((currentAction) =>
+        currentAction.id === action.id ? updatedAction : currentAction
+      )
+    );
+
+    try {
+      const response = await fetch("http://localhost:8787/api/agent-actions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: updatedAction })
+      });
+      if (!response.ok) throw new Error(`Agent endpoint returned ${response.status}`);
+
+      const payload = await response.json();
+      if (payload.action) {
+        setAgentActions((currentActions) =>
+          currentActions.map((currentAction) =>
+            currentAction.id === action.id ? payload.action : currentAction
+          )
+        );
+      }
+      setAgentSyncStatus("database");
+    } catch {
+      setAgentSyncStatus("local");
+    }
+  }
+
+  function queueNetworkAction(actionType: string, subject: string, body: string) {
+    void createAgentAction({ actionType, subject, body });
+    setCurrentPage("agents");
+    window.location.hash = "agents";
   }
 
   async function runLiveJobSearch() {
@@ -1608,7 +1732,18 @@ function App() {
               <p className="eyebrow">Resume workspace</p>
               <h3>Eric’s current and baseline resumes</h3>
             </div>
-            <span className="progress-pill">{resumeProfile.skills.length} saved skills</span>
+            <div className="panel-actions">
+              <span className={`provider-pill ${resumeSyncStatus === "database" ? "ok" : resumeSyncStatus === "error" ? "error" : "missing_key"}`}>
+                {resumeSyncStatus === "database"
+                  ? "Supabase synced"
+                  : resumeSyncStatus === "loading"
+                    ? "Syncing"
+                    : resumeSyncStatus === "error"
+                      ? "Sync issue"
+                      : "Local fallback"}
+              </span>
+              <span className="progress-pill">{resumeProfile.skills.length} saved skills</span>
+            </div>
           </div>
           <div className="resume-maintenance">
             <div>
@@ -2052,6 +2187,15 @@ function App() {
                 <p className="eyebrow">Autopilot</p>
                 <h3>Eric’s agents</h3>
               </div>
+              <span className={`provider-pill ${agentSyncStatus === "database" ? "ok" : agentSyncStatus === "error" ? "error" : "missing_key"}`}>
+                {agentSyncStatus === "database"
+                  ? "Supabase synced"
+                  : agentSyncStatus === "loading"
+                    ? "Syncing"
+                    : agentSyncStatus === "error"
+                      ? "Sync issue"
+                      : "Local fallback"}
+              </span>
             </div>
             <div className="agent-list">
               {agents.map((agent) => (
@@ -2065,6 +2209,38 @@ function App() {
                 </article>
               ))}
             </div>
+            <div className="agent-list">
+              {agentActions.map((action) => (
+                <article className="agent-row" key={action.id}>
+                  <div className="agent-icon">
+                    <Bot size={17} />
+                  </div>
+                  <div>
+                    <strong>{action.subject}</strong>
+                    <span>{action.body || action.actionType.replace(/_/g, " ")}</span>
+                  </div>
+                  <em>{action.status}</em>
+                  <div className="application-actions">
+                    {action.status === "draft" ? (
+                      <button className="ghost-button" type="button" onClick={() => void updateAgentActionStatus(action, "approved")}>
+                        Approve
+                      </button>
+                    ) : null}
+                    {action.status !== "skipped" && action.status !== "sent" ? (
+                      <button className="ghost-button" type="button" onClick={() => void updateAgentActionStatus(action, "skipped")}>
+                        Skip
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+            {agentActions.length === 0 ? (
+              <div className="empty-state">
+                <strong>No agent drafts queued.</strong>
+                <span>Use Network actions or application follow-ups to create approval-required drafts.</span>
+              </div>
+            ) : null}
           </div>
 
           <div className="panel hidden-page">
@@ -2097,6 +2273,47 @@ function App() {
               <SocialItem icon={<UserRoundCheck size={17} />} label="LinkedIn profile" value="Finance analyst positioning" />
               <SocialItem icon={<MessageSquareText size={17} />} label="Post draft" value="Rambler Investment Fund insight" />
               <SocialItem icon={<MailCheck size={17} />} label="Outreach" value="Banking and capital markets contacts" />
+            </div>
+            <div className="packet-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() =>
+                  queueNetworkAction(
+                    "linkedin_profile_review",
+                    "Review Eric’s LinkedIn positioning",
+                    "Draft suggested LinkedIn headline/about edits aligned to finance internships and Eric’s approved baseline resume."
+                  )
+                }
+              >
+                <Sparkles size={16} /> Queue profile review
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  queueNetworkAction(
+                    "social_post",
+                    "Draft LinkedIn post",
+                    "Draft an approval-required LinkedIn post about Eric’s finance learning, Rambler Investment Fund work, or internship search progress."
+                  )
+                }
+              >
+                Draft post
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  queueNetworkAction(
+                    "network_outreach",
+                    "Draft networking outreach",
+                    "Draft a concise outreach message for finance, banking, treasury, or capital markets contacts."
+                  )
+                }
+              >
+                Draft outreach
+              </button>
             </div>
           </div>
         </section>

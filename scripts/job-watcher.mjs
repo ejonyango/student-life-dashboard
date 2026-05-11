@@ -514,6 +514,97 @@ async function handleCourses(request, response) {
   sendJson(response, 200, await saveCourseRecord(body.course || body));
 }
 
+function mapAgentActionRow(row) {
+  return {
+    id: row.id,
+    actionType: row.action_type,
+    status: row.status,
+    subject: row.subject || "",
+    body: row.body || "",
+    relatedApplicationId: row.related_application_id || "",
+    createdAt: row.created_at,
+    approvedAt: row.approved_at,
+    completedAt: row.completed_at
+  };
+}
+
+async function listAgentActions() {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, database: false, actions: [], reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      select agent_actions.*
+      from public.agent_actions
+      join public.student_profiles on student_profiles.id = agent_actions.student_id
+      where student_profiles.slug = 'eric-onyango'
+      order by agent_actions.created_at desc
+      limit 50
+    `
+  );
+
+  return { ok: true, database: true, actions: result.rows.map(mapAgentActionRow) };
+}
+
+async function saveAgentAction(action) {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, saved: false, reason: "database_not_configured" };
+  }
+
+  if (action.id) {
+    const result = await pool.query(
+      `
+        update public.agent_actions
+        set status = $2,
+            approved_at = case when $2 = 'approved' then now() else approved_at end,
+            completed_at = case when $2 in ('sent', 'skipped', 'error') then now() else completed_at end
+        where id = $1
+        returning *
+      `,
+      [action.id, action.status || "draft"]
+    );
+
+    return { ok: true, saved: true, action: mapAgentActionRow(result.rows[0]) };
+  }
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.agent_actions (
+        student_id,
+        action_type,
+        status,
+        subject,
+        body
+      )
+      values ((select id from student), $1, 'draft', $2, $3)
+      returning *
+    `,
+    [
+      action.actionType || action.action_type || "manual_action",
+      action.subject || "Agent action draft",
+      action.body || ""
+    ]
+  );
+
+  return { ok: true, saved: true, action: mapAgentActionRow(result.rows[0]) };
+}
+
+async function handleAgentActions(request, response) {
+  if (request.method === "GET") {
+    sendJson(response, 200, await listAgentActions());
+    return;
+  }
+
+  const body = await readBody(request);
+  sendJson(response, 200, await saveAgentAction(body.action || body));
+}
+
 async function saveApplicationPacketRecord(client, studentId, application) {
   if (!application.packet) return null;
 
@@ -1278,6 +1369,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/courses" && (request.method === "GET" || request.method === "POST" || request.method === "DELETE")) {
       await handleCourses(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/agent-actions" && (request.method === "GET" || request.method === "POST")) {
+      await handleAgentActions(request, response);
       return;
     }
 
