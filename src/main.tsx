@@ -1030,10 +1030,24 @@ function App() {
     });
   }
 
+  async function persistApplication(application: Application) {
+    try {
+      await fetch("http://localhost:8787/api/applications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ application })
+      });
+    } catch {
+      // Local storage remains the offline fallback when the watcher/database is unavailable.
+    }
+  }
+
   function saveApplicationDraft() {
     if (!applicationPacket) return;
 
-    upsertApplication({
+    const application: Application = {
       company: applicationPacket.listing.company,
       role: applicationPacket.listing.role,
       status: "Drafting",
@@ -1042,7 +1056,9 @@ function App() {
       source: applicationPacket.listing.sourceBoard,
       applicationLink: applicationPacket.listing.applicationLink,
       resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`
-    });
+    };
+    upsertApplication(application);
+    void persistApplication(application);
     setCurrentPage("applications");
     window.location.hash = "applications";
   }
@@ -1050,7 +1066,7 @@ function App() {
   function markApplicationApplied() {
     if (!applicationPacket) return;
 
-    upsertApplication({
+    const application: Application = {
       company: applicationPacket.listing.company,
       role: applicationPacket.listing.role,
       status: "Applied",
@@ -1059,7 +1075,9 @@ function App() {
       source: applicationPacket.listing.sourceBoard,
       applicationLink: applicationPacket.listing.applicationLink,
       resumeVersion: `${baselineResume.status} baseline · ${baselineResume.updatedAt}`
-    });
+    };
+    upsertApplication(application);
+    void persistApplication(application);
     setCurrentPage("applications");
     window.location.hash = "applications";
   }

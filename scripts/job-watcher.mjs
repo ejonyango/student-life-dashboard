@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { URL } from "node:url";
+import pg from "pg";
 
 const localEnv = {};
 
@@ -63,10 +64,12 @@ const providerConfig = {
   deepSeekBaseUrl: (localEnv.DEEPSEEK_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, ""),
   deepSeekFastModel: localEnv.DEEPSEEK_FAST_MODEL || process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash",
   deepSeekProModel: localEnv.DEEPSEEK_PRO_MODEL || process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro",
-  deepSeekPacketRoute: localEnv.DEEPSEEK_PACKET_ROUTE || process.env.DEEPSEEK_PACKET_ROUTE || "fast"
+  deepSeekPacketRoute: localEnv.DEEPSEEK_PACKET_ROUTE || process.env.DEEPSEEK_PACKET_ROUTE || "fast",
+  databaseUrl: localEnv.SUPABASE_DB_URL || process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || ""
 };
 
 let theirStackMemoryCache = null;
+let dbPool = null;
 
 function readTheirStackCache() {
   if (theirStackMemoryCache) return theirStackMemoryCache;
@@ -118,6 +121,106 @@ function readBody(request) {
     });
     request.on("error", reject);
   });
+}
+
+function getDbPool() {
+  if (!providerConfig.databaseUrl) return null;
+  if (!dbPool) {
+    const { Pool } = pg;
+    dbPool = new Pool({
+      connectionString: providerConfig.databaseUrl,
+      ssl: { rejectUnauthorized: false },
+      max: 3
+    });
+  }
+  return dbPool;
+}
+
+function toDatabaseStatus(status = "Drafting") {
+  const statuses = {
+    Applied: "applied",
+    Interview: "interview",
+    Drafting: "drafting",
+    "Follow-up": "follow_up",
+    "Offer prep": "offer_prep"
+  };
+  return statuses[status] || "drafting";
+}
+
+async function saveApplicationRecord(application) {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, saved: false, reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      with student as (
+        select id from public.student_profiles where slug = 'eric-onyango' limit 1
+      )
+      insert into public.applications (
+        student_id,
+        company,
+        role,
+        status,
+        next_step,
+        fit,
+        source,
+        application_link,
+        updated_at,
+        applied_at
+      )
+      values (
+        (select id from student),
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        now(),
+        case when $3 = 'applied' then now() else null end
+      )
+      on conflict (student_id, company, role)
+      do update set
+        status = excluded.status,
+        next_step = excluded.next_step,
+        fit = excluded.fit,
+        source = excluded.source,
+        application_link = excluded.application_link,
+        updated_at = now(),
+        applied_at = case
+          when excluded.status = 'applied' and public.applications.applied_at is null then now()
+          else public.applications.applied_at
+        end
+      returning id, company, role, status, next_step, fit, source, application_link, created_at, updated_at, applied_at
+    `,
+    [
+      application.company,
+      application.role,
+      toDatabaseStatus(application.status),
+      application.next || "",
+      Number(application.fit || 0),
+      application.source || "",
+      application.applicationLink || ""
+    ]
+  );
+
+  return { ok: true, saved: true, application: result.rows[0] };
+}
+
+async function handleSaveApplication(request, response) {
+  const body = await readBody(request);
+  const application = body.application || body;
+
+  if (!application.company || !application.role) {
+    sendJson(response, 400, { ok: false, saved: false, error: "company and role are required" });
+    return;
+  }
+
+  const result = await saveApplicationRecord(application);
+  sendJson(response, 200, result);
 }
 
 function cleanHtml(value = "") {
@@ -666,6 +769,7 @@ const server = createServer(async (request, response) => {
           serpApi: Boolean(providerConfig.serpApi),
           rapidApi: Boolean(providerConfig.rapidApiKey),
           deepSeek: Boolean(providerConfig.deepSeekKey),
+          database: Boolean(providerConfig.databaseUrl),
           deepSeekBaseUrl: providerConfig.deepSeekBaseUrl,
           deepSeekFastModel: providerConfig.deepSeekFastModel,
           deepSeekProModel: providerConfig.deepSeekProModel,
@@ -684,6 +788,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/application-packet" && request.method === "POST") {
       await handleApplicationPacket(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/applications" && request.method === "POST") {
+      await handleSaveApplication(request, response);
       return;
     }
 
