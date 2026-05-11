@@ -1225,6 +1225,36 @@ function App() {
     }
   }
 
+  function updateApplicationWorkflow(application: Application, status: Application["status"]) {
+    const nextByStatus: Record<Application["status"], string> = {
+      Drafting: "Review tailored packet, verify application link, then decide whether to apply.",
+      Applied: "Create a 7-day follow-up reminder and watch email for recruiter replies.",
+      "Follow-up": "AI follow-up draft queued for approval; check email replies before sending.",
+      Interview: "Prepare interview notes, schedule the meeting, and rehearse fit/technical answers.",
+      "Offer prep": "Compare offer details, deadlines, compensation, and school schedule fit."
+    };
+    const updatedApplication: Application = {
+      ...application,
+      status,
+      next: nextByStatus[status]
+    };
+
+    upsertApplication(updatedApplication);
+    void persistApplication(updatedApplication);
+  }
+
+  function openSavedApplicationUrl(application: Application) {
+    const rawUrl = application.applicationLink?.trim();
+    if (!rawUrl) return;
+
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+    if (!openedWindow) {
+      window.location.href = url;
+    }
+  }
+
   function saveApplicationDraft() {
     if (!applicationPacket) return;
 
@@ -1811,11 +1841,33 @@ function App() {
                   <span style={{ width: `${application.fit}%` }} />
                 </div>
                 <p>{application.next}</p>
-                {application.packet ? (
-                  <button className="ghost-button" type="button" onClick={() => viewSavedPacket(application)}>
-                    View packet
-                  </button>
-                ) : null}
+                <div className="application-actions">
+                  {application.packet ? (
+                    <button className="ghost-button" type="button" onClick={() => viewSavedPacket(application)}>
+                      View packet
+                    </button>
+                  ) : null}
+                  {application.applicationLink ? (
+                    <button className="ghost-button" type="button" onClick={() => openSavedApplicationUrl(application)}>
+                      Open link
+                    </button>
+                  ) : null}
+                  {application.status !== "Applied" && application.status !== "Interview" ? (
+                    <button className="ghost-button" type="button" onClick={() => updateApplicationWorkflow(application, "Applied")}>
+                      Mark applied
+                    </button>
+                  ) : null}
+                  {application.status === "Applied" ? (
+                    <button className="ghost-button" type="button" onClick={() => updateApplicationWorkflow(application, "Follow-up")}>
+                      Queue follow-up
+                    </button>
+                  ) : null}
+                  {application.status === "Applied" || application.status === "Follow-up" ? (
+                    <button className="ghost-button" type="button" onClick={() => updateApplicationWorkflow(application, "Interview")}>
+                      Log interview
+                    </button>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>

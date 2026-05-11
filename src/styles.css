@@ -1079,6 +1079,18 @@ button {
   gap: 10px;
 }
 
+.application-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.application-actions .ghost-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.86rem;
+}
+
 .packet-actions .application-link.secondary {
   min-height: 40px;
   padding: 0 12px;

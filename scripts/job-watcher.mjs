@@ -589,6 +589,45 @@ async function saveApplicationRecord(application) {
       ]
     );
 
+    if (toDatabaseStatus(application.status) === "follow_up") {
+      await client.query(
+        `
+          insert into public.agent_actions (
+            student_id,
+            action_type,
+            status,
+            subject,
+            body,
+            related_application_id
+          )
+          values ($1, 'follow_up_email', 'draft', $2, $3, $4)
+        `,
+        [
+          studentId,
+          `Follow up with ${application.company}`,
+          `Draft a concise follow-up for Eric regarding the ${application.role} application at ${application.company}.`,
+          result.rows[0].id
+        ]
+      );
+    }
+
+    if (toDatabaseStatus(application.status) === "interview") {
+      await client.query(
+        `
+          insert into public.interviews (
+            application_id,
+            interview_type,
+            notes
+          )
+          values ($1, 'Prep needed', $2)
+        `,
+        [
+          result.rows[0].id,
+          `Prepare Eric for ${application.company}'s ${application.role} interview.`
+        ]
+      );
+    }
+
     await client.query("commit");
     return { ok: true, saved: true, packetSaved: Boolean(packetId), application: result.rows[0] };
   } catch (error) {
