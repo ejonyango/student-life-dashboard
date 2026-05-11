@@ -1610,7 +1610,7 @@ function buildAgentActionPrompt(body, route) {
     isRenewableBrief
       ? 'Required keys: { "subject": string, "body": string, "trendThemes": string[], "importantDevelopments": string[], "industryImpacts": string[], "investmentAngles": string[], "sourceNotes": string[], "approvalChecklist": string[], "riskNotes": string[] }'
       : isAssignmentCheckin
-        ? 'Required keys: { "subject": string, "body": string, "actionPlan": string[], "scheduleBlocks": string[], "clarifyingQuestions": string[], "approvalChecklist": string[], "riskNotes": string[] }'
+        ? 'Required keys: { "subject": string, "body": string, "actionPlan": string[], "scheduleBlocks": string[], "studyPlanBlocks": Array<{ "assignmentTitle": string, "courseName": string, "title": string, "focus": string, "daysBeforeDue": number, "preferredStartTime": string, "durationMinutes": number, "priority": "low" | "medium" | "high" }>, "clarifyingQuestions": string[], "approvalChecklist": string[], "riskNotes": string[] }'
       : isResearchAdvisor
         ? 'Required keys: { "subject": string, "body": string, "researchPlan": string[], "suggestedSources": string[], "searchKeywords": string[], "clarifyingQuestions": string[], "approvalChecklist": string[], "riskNotes": string[] }'
       : 'Required keys: { "subject": string, "body": string, "approvalChecklist": string[], "riskNotes": string[] }',
@@ -1632,6 +1632,11 @@ function buildAgentActionPrompt(body, route) {
       "- Use assignment due dates to create a practical action plan to finish work on time.",
       "- Use textbook and assigned page ranges when provided to make reading and study blocks concrete.",
       "- Break work into schedule blocks ordered by urgency.",
+      "- Return studyPlanBlocks as structured calendar-ready AI recommendations.",
+      "- Each studyPlanBlocks item must map to a real assignment by assignmentTitle and courseName.",
+      "- Use daysBeforeDue instead of exact dates. Use 0 only for work that should happen on the due date.",
+      "- Use preferredStartTime such as \"6:00 PM\" or \"7:30 PM\" and durationMinutes between 30 and 180.",
+      "- Generate 1-3 studyPlanBlocks per open assignment depending on urgency and complexity.",
       "- Ask for missing assignment details, rubrics, or due dates when necessary.",
       "- Consider current courses and avoid overloading one day."
     ] : []),

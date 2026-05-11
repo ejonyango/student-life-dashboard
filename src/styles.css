@@ -2168,6 +2168,12 @@ button.application-link {
   border-radius: 8px;
 }
 
+.advisor-planner-note {
+  margin-top: 0;
+  background: #fff9ea;
+  border: 1px solid #f2df89;
+}
+
 .agent-row {
   align-items: flex-start;
   padding: 12px;

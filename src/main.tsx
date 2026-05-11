@@ -185,12 +185,24 @@ type AdvisorResult = {
   sourceNotes?: string[];
   actionPlan?: string[];
   scheduleBlocks?: string[];
+  studyPlanBlocks?: StudyPlanBlock[];
   researchPlan?: string[];
   suggestedSources?: string[];
   searchKeywords?: string[];
   clarifyingQuestions?: string[];
   approvalChecklist?: string[];
   riskNotes?: string[];
+};
+
+type StudyPlanBlock = {
+  assignmentTitle?: string;
+  courseName?: string;
+  title?: string;
+  focus?: string;
+  daysBeforeDue?: number;
+  preferredStartTime?: string;
+  durationMinutes?: number;
+  priority?: "low" | "medium" | "high";
 };
 
 type AssignmentTask = {
@@ -1033,6 +1045,7 @@ function App() {
   const approvedStudyBlocks = getApprovedStudyBlocks(calendarEntries);
   const studyPlanSignature = getStudyPlanSignature(assignmentTasks);
   const studyPlanNeedsRefresh = studyPlanState.status === "approved" && studyPlanState.sourceSignature !== studyPlanSignature;
+  const hasAiStudyPlanBlocks = Boolean(advisorResult?.studyPlanBlocks?.length);
   const assignmentFreshness = getAssignmentFreshness(assignmentTasks, reminderSettings.lastCheckedAt);
   const calendarDays = buildDueCalendar(calendarMonth, assignmentTasks, calendarEntries);
   const calendarMonthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -1754,6 +1767,8 @@ function App() {
   }
 
   async function approveAdvisorStudyPlan() {
+    if (!advisorResult?.studyPlanBlocks?.length) return;
+
     const studyBlocks = buildStudyPlanEntries(assignmentTasks, advisorResult, courseList);
     if (studyBlocks.length === 0) return;
 
@@ -1831,6 +1846,9 @@ function App() {
           formatNotebookSection("Source notes", advisorResult.sourceNotes),
           formatNotebookSection("Action plan", advisorResult.actionPlan),
           formatNotebookSection("Schedule blocks", advisorResult.scheduleBlocks),
+          formatNotebookSection("AI study blocks", advisorResult.studyPlanBlocks?.map((block) =>
+            `${block.courseName || "Course"}: ${block.title || block.assignmentTitle || "Study block"} · ${block.focus || "Focused work"} · ${block.daysBeforeDue ?? 1} day(s) before due · ${block.preferredStartTime || "6:00 PM"} · ${block.durationMinutes || 75} minutes`
+          )),
           formatNotebookSection("Research plan", advisorResult.researchPlan),
           formatNotebookSection("Suggested sources", advisorResult.suggestedSources),
           formatNotebookSection("Search keywords", advisorResult.searchKeywords),
@@ -2307,9 +2325,9 @@ function App() {
                 </p>
                 <div className="packet-actions">
                   <a className="ghost-button" href="#advisor" onClick={() => setAdvisorTask("assignment_checkin")}>
-                    Advisor
+                    Generate with AI
                   </a>
-                  <button className="ghost-button" type="button" onClick={approveAdvisorStudyPlan} disabled={!assignmentTasks.length}>
+                  <button className="ghost-button" type="button" onClick={approveAdvisorStudyPlan} disabled={!hasAiStudyPlanBlocks}>
                     Refresh plan
                   </button>
                 </div>
@@ -3418,6 +3436,12 @@ function App() {
               <button className="primary-button" type="button" onClick={runAdvisorTask} disabled={advisorStatus === "loading"}>
                 <Sparkles size={16} /> {advisorStatus === "loading" ? "Generating" : "Run advisor"}
               </button>
+              {advisorTask === "assignment_checkin" ? (
+                <div className="planner-card advisor-planner-note">
+                  <Sparkles size={18} />
+                  <span>Run Advisor after assignments are entered to generate AI study blocks. Eric approves them before they are added to Calendar.</span>
+                </div>
+              ) : null}
             </div>
             <div className="advisor-output">
               <div className="advisor-context">
@@ -3435,6 +3459,12 @@ function App() {
                   <AdvisorList title="Source notes" items={advisorResult.sourceNotes} />
                   <AdvisorList title="Action plan" items={advisorResult.actionPlan} />
                   <AdvisorList title="Schedule blocks" items={advisorResult.scheduleBlocks} />
+                  <AdvisorList
+                    title="AI study blocks"
+                    items={advisorResult.studyPlanBlocks?.map((block) =>
+                      `${block.courseName || "Course"}: ${block.title || block.assignmentTitle || "Study block"} · ${block.focus || "Focused work"} · ${block.daysBeforeDue ?? 1} day(s) before due · ${block.preferredStartTime || "6:00 PM"}`
+                    )}
+                  />
                   <AdvisorList title="Research plan" items={advisorResult.researchPlan} />
                   <AdvisorList title="Suggested sources" items={advisorResult.suggestedSources} />
                   <AdvisorList title="Search keywords" items={advisorResult.searchKeywords} />
@@ -3448,10 +3478,12 @@ function App() {
                         <span>
                           {studyPlanState.status === "approved"
                             ? `${approvedStudyBlocks.length} approved study blocks are on the calendar.`
-                            : "Approve the generated study plan to add study blocks to the calendar."}
+                            : hasAiStudyPlanBlocks
+                              ? "Approve the AI-generated study plan to add study blocks to the calendar."
+                              : "Run the Advisor to generate AI study blocks before approval."}
                         </span>
                       </div>
-                      <button className="primary-button" type="button" onClick={approveAdvisorStudyPlan} disabled={!assignmentTasks.length}>
+                      <button className="primary-button" type="button" onClick={approveAdvisorStudyPlan} disabled={!hasAiStudyPlanBlocks}>
                         <CheckCircle2 size={16} /> {studyPlanState.status === "approved" ? "Update approved plan" : "Approve study plan"}
                       </button>
                     </div>
@@ -4019,45 +4051,75 @@ function getStudyPlanSignature(assignments: AssignmentTask[]) {
 
 function buildStudyPlanEntries(assignments: AssignmentTask[], advisorResult: AdvisorResult | null, courses: Lesson[]): CalendarEntry[] {
   const openAssignments = getUpcomingAssignments(assignments).slice(0, 8);
-  const scheduleBlocks = advisorResult?.scheduleBlocks || [];
+  const aiBlocks = advisorResult?.studyPlanBlocks || [];
 
-  return openAssignments.flatMap((assignment, assignmentIndex) => {
+  if (!aiBlocks.length) return [];
+
+  return aiBlocks.flatMap((block, blockIndex) => {
+    const assignment = findAssignmentForStudyBlock(block, openAssignments);
+    if (!assignment) return [];
     const dueDate = parseAssignmentDueDate(assignment);
     if (!dueDate) return [];
-    const daysBeforeDue = assignment.priority === "high" ? [4, 2, 1] : assignment.priority === "medium" ? [3, 1] : [1];
 
-    return daysBeforeDue.map((daysBefore, blockIndex) => {
-      const startsAt = new Date(dueDate);
-      startsAt.setDate(dueDate.getDate() - daysBefore);
-      startsAt.setHours(blockIndex === 0 ? 18 : 19, 0, 0, 0);
-      const endsAt = new Date(startsAt.getTime() + 75 * 60 * 1000);
-      const advisorBlock = scheduleBlocks[(assignmentIndex + blockIndex) % Math.max(scheduleBlocks.length, 1)] || "";
-      const title = `${assignment.courseName}: ${blockIndex === daysBeforeDue.length - 1 ? "final review" : "study block"} - ${assignment.title}`;
-      const notes = [
-        "Approved advisor study plan.",
-        advisorBlock,
-        formatAssignmentReading(assignment, courses),
-        assignment.details
-      ].filter(Boolean).join("\n\n");
+    const daysBeforeDue = clampNumber(block.daysBeforeDue, 0, 14, assignment.priority === "high" ? 2 : 1);
+    const durationMinutes = clampNumber(block.durationMinutes, 30, 180, 75);
+    const startsAt = new Date(dueDate);
+    startsAt.setDate(dueDate.getDate() - daysBeforeDue);
+    const preferredTime = parsePreferredStudyTime(block.preferredStartTime, blockIndex);
+    startsAt.setHours(preferredTime.hours, preferredTime.minutes, 0, 0);
+    const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
+    const title = `${assignment.courseName}: ${block.title || block.focus || "AI study block"} - ${assignment.title}`;
+    const notes = [
+      "Approved AI-generated advisor study plan.",
+      block.focus,
+      formatAssignmentReading(assignment, courses),
+      assignment.details
+    ].filter(Boolean).join("\n\n");
 
-      const entry: CalendarEntry = {
-        assignmentId: assignment.id,
-        title,
-        courseName: assignment.courseName,
-        startsAt: toDateTimeLocalValue(startsAt),
-        endsAt: toDateTimeLocalValue(endsAt),
-        location: "Study plan",
-        notes,
-        eventType: "study_block",
-        source: "advisor_study_plan"
-      };
+    const entry: CalendarEntry = {
+      assignmentId: assignment.id,
+      title,
+      courseName: assignment.courseName,
+      startsAt: toDateTimeLocalValue(startsAt),
+      endsAt: toDateTimeLocalValue(endsAt),
+      location: "AI study plan",
+      notes,
+      eventType: "study_block",
+      source: "advisor_study_plan"
+    };
 
-      return {
-        ...entry,
-        googleEventUrl: buildGoogleCalendarUrl(entry)
-      };
-    });
+    return {
+      ...entry,
+      googleEventUrl: buildGoogleCalendarUrl(entry)
+    };
   });
+}
+
+function findAssignmentForStudyBlock(block: StudyPlanBlock, assignments: AssignmentTask[]) {
+  const courseName = (block.courseName || "").toLowerCase();
+  const assignmentTitle = (block.assignmentTitle || block.title || "").toLowerCase();
+
+  return assignments.find((assignment) =>
+    (courseName && assignment.courseName.toLowerCase().includes(courseName))
+    || (assignmentTitle && assignment.title.toLowerCase().includes(assignmentTitle))
+  ) || assignments[0];
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  const numberValue = typeof value === "number" ? value : Number(value);
+  if (Number.isNaN(numberValue)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(numberValue)));
+}
+
+function parsePreferredStudyTime(value: string | undefined, index: number) {
+  const match = value?.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!match) return { hours: index % 2 === 0 ? 18 : 19, minutes: 0 };
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const meridiem = match[3]?.toLowerCase();
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  return { hours: Math.min(23, Math.max(6, hours)), minutes: Math.min(59, Math.max(0, minutes)) };
 }
 
 function getAssignmentFreshness(assignments: AssignmentTask[], lastCheckedAt?: string) {
