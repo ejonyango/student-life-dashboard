@@ -346,8 +346,11 @@ button {
   gap: 18px;
   padding: 24px;
   background:
-    linear-gradient(135deg, rgba(11, 47, 71, 0.96), rgba(11, 117, 165, 0.88)),
+    linear-gradient(135deg, rgba(11, 47, 71, 0.94), rgba(140, 29, 64, 0.72) 58%, rgba(65, 182, 230, 0.55)),
+    url("https://images.unsplash.com/photo-1494522855154-9297ac14b55f?auto=format&fit=crop&w=1800&q=80"),
     #0b2f47;
+  background-position: center;
+  background-size: cover;
   color: #ffffff;
 }
 
@@ -385,7 +388,7 @@ button {
 
 .dashboard-pulse {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -487,6 +490,14 @@ button {
 
 .compact-reminder .packet-actions {
   margin-top: 12px;
+}
+
+.study-plan-panel {
+  border-top: 4px solid var(--loyola-gold);
+}
+
+.study-plan-panel.needs-attention {
+  border-top-color: var(--chicago-red);
 }
 
 .command-primary,
@@ -1124,6 +1135,16 @@ button {
   font-size: 0.9rem;
 }
 
+.due-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.due-actions .ghost-button {
+  min-height: 32px;
+}
+
 .due-row small {
   overflow: hidden;
   color: #476576;
@@ -1253,6 +1274,29 @@ button {
 .notebooklm-bridge textarea {
   min-height: 220px;
   resize: vertical;
+}
+
+.study-plan-approval {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  background: #fff9ea;
+  border: 1px solid #f2df89;
+  border-left: 4px solid var(--loyola-gold);
+  border-radius: 8px;
+}
+
+.study-plan-approval.needs-attention {
+  border-left-color: var(--chicago-red);
+}
+
+.study-plan-approval span {
+  display: block;
+  margin-top: 4px;
+  color: #5e7180;
+  font-size: 0.9rem;
 }
 
 .advisor-output {

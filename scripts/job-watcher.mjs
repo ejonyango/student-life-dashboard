@@ -553,6 +553,38 @@ async function saveAssignment(assignment) {
   const pool = getDbPool();
   if (!pool) return { ok: false, saved: false, reason: "database_not_configured" };
 
+  if (assignment.id) {
+    const result = await pool.query(
+      `
+        update public.assignment_tasks
+        set course_name = $2,
+            title = $3,
+            due_at = nullif($4, '')::timestamptz,
+            textbook = $5,
+            assigned_pages = $6,
+            details = $7,
+            status = $8,
+            priority = $9,
+            updated_at = now()
+        where id = $1
+        returning *
+      `,
+      [
+        assignment.id,
+        assignment.courseName || assignment.course || "General",
+        assignment.title || "Untitled assignment",
+        assignment.dueAt || "",
+        assignment.textbook || "",
+        assignment.assignedPages || assignment.pages || "",
+        assignment.details || "",
+        assignment.status || "open",
+        assignment.priority || "medium"
+      ]
+    );
+
+    return { ok: true, saved: true, assignment: mapAssignmentRow(result.rows[0]) };
+  }
+
   const result = await pool.query(
     `
       with student as (
@@ -675,6 +707,7 @@ async function handleClassNotes(request, response) {
 function mapCalendarEventRow(row) {
   return {
     id: row.id,
+    assignmentId: row.assignment_task_id || "",
     title: row.title,
     courseName: row.course_name || "",
     startsAt: row.starts_at,
@@ -682,6 +715,7 @@ function mapCalendarEventRow(row) {
     location: row.location || "",
     notes: row.notes || "",
     eventType: row.event_type || "study_block",
+    source: row.source || "manual",
     googleEventUrl: row.google_event_url || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -718,6 +752,7 @@ async function saveCalendarEvent(event) {
       )
       insert into public.calendar_events (
         student_id,
+        assignment_task_id,
         title,
         course_name,
         starts_at,
@@ -725,13 +760,15 @@ async function saveCalendarEvent(event) {
         location,
         notes,
         event_type,
+        source,
         google_event_url,
         updated_at
       )
-      values ((select id from student), $1, $2, nullif($3, '')::timestamptz, nullif($4, '')::timestamptz, $5, $6, $7, $8, now())
+      values ((select id from student), nullif($1, '')::uuid, $2, $3, nullif($4, '')::timestamptz, nullif($5, '')::timestamptz, $6, $7, $8, $9, $10, now())
       returning *
     `,
     [
+      event.assignmentId || event.assignment_task_id || "",
       event.title || "Calendar event",
       event.courseName || event.course_name || "",
       event.startsAt || event.starts_at || "",
@@ -739,6 +776,7 @@ async function saveCalendarEvent(event) {
       event.location || "",
       event.notes || "",
       event.eventType || event.event_type || "study_block",
+      event.source || "manual",
       event.googleEventUrl || event.google_event_url || ""
     ]
   );
@@ -746,9 +784,34 @@ async function saveCalendarEvent(event) {
   return { ok: true, saved: true, event: mapCalendarEventRow(result.rows[0]) };
 }
 
+async function deleteCalendarEvents(criteria) {
+  const pool = getDbPool();
+  if (!pool) return { ok: false, deleted: 0, reason: "database_not_configured" };
+
+  const result = await pool.query(
+    `
+      delete from public.calendar_events
+      using public.student_profiles
+      where calendar_events.student_id = student_profiles.id
+        and student_profiles.slug = 'eric-onyango'
+        and ($1::text is null or calendar_events.source = $1)
+      returning calendar_events.id
+    `,
+    [criteria.source || null]
+  );
+
+  return { ok: true, deleted: result.rowCount };
+}
+
 async function handleCalendarEvents(request, response) {
   if (request.method === "GET") {
     sendJson(response, 200, await listCalendarEvents());
+    return;
+  }
+
+  if (request.method === "DELETE") {
+    const body = await readBody(request);
+    sendJson(response, 200, await deleteCalendarEvents(body));
     return;
   }
 
@@ -1974,7 +2037,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (url.pathname === "/api/calendar-events" && (request.method === "GET" || request.method === "POST")) {
+    if (url.pathname === "/api/calendar-events" && (request.method === "GET" || request.method === "POST" || request.method === "DELETE")) {
       await handleCalendarEvents(request, response);
       return;
     }

@@ -240,6 +240,7 @@ type CalendarDueDay = {
 
 type CalendarEntry = {
   id?: string;
+  assignmentId?: string;
   title: string;
   courseName: string;
   startsAt: string;
@@ -247,9 +248,16 @@ type CalendarEntry = {
   location: string;
   notes: string;
   eventType: "study_block" | "class_event" | "interview" | "deadline" | "personal";
+  source?: "manual" | "advisor_study_plan";
   googleEventUrl?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type StudyPlanState = {
+  status: "none" | "draft" | "approved";
+  approvedAt: string;
+  sourceSignature: string;
 };
 
 type ApplicationPacket = {
@@ -929,6 +937,12 @@ const defaultReminderSettings: ReminderSettings = {
   }
 };
 
+const defaultStudyPlanState: StudyPlanState = {
+  status: "none",
+  approvedAt: "",
+  sourceSignature: ""
+};
+
 function getPageFromHash(): Page {
   const page = window.location.hash.replace("#", "") as Page;
   return pageTitles[page] ? page : "dashboard";
@@ -970,6 +984,7 @@ function App() {
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(() => loadReminderSettings());
+  const [studyPlanState, setStudyPlanState] = useState<StudyPlanState>(() => loadStudyPlanState());
   const [classNotes, setClassNotes] = useState<ClassNote[]>([]);
   const [assignmentForm, setAssignmentForm] = useState<AssignmentTask>({
     courseName: "",
@@ -995,7 +1010,8 @@ function App() {
     endsAt: "",
     location: "",
     notes: "",
-    eventType: "study_block"
+    eventType: "study_block",
+    source: "manual"
   });
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
@@ -1014,6 +1030,9 @@ function App() {
   const coursesLeftAfterCurrentTerm = Math.max(0, plannedCourseCount - registeredCourseCount);
   const upcomingAssignments = getUpcomingAssignments(assignmentTasks);
   const upcomingCalendarEntries = getUpcomingCalendarEntries(calendarEntries);
+  const approvedStudyBlocks = getApprovedStudyBlocks(calendarEntries);
+  const studyPlanSignature = getStudyPlanSignature(assignmentTasks);
+  const studyPlanNeedsRefresh = studyPlanState.status === "approved" && studyPlanState.sourceSignature !== studyPlanSignature;
   const assignmentFreshness = getAssignmentFreshness(assignmentTasks, reminderSettings.lastCheckedAt);
   const calendarDays = buildDueCalendar(calendarMonth, assignmentTasks, calendarEntries);
   const calendarMonthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -1054,6 +1073,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem("student-life.assignment-reminders", JSON.stringify(reminderSettings));
   }, [reminderSettings]);
+
+  useEffect(() => {
+    window.localStorage.setItem("student-life.study-plan", JSON.stringify(studyPlanState));
+  }, [studyPlanState]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1668,6 +1691,7 @@ function App() {
       title: calendarEntryForm.title.trim(),
       courseName: calendarEntryForm.courseName.trim(),
       endsAt: calendarEntryForm.endsAt || calendarEntryForm.startsAt,
+      source: "manual" as const,
       googleEventUrl: buildGoogleCalendarUrl(calendarEntryForm)
     };
     setCalendarEntries((currentEntries) => [entry, ...currentEntries]);
@@ -1695,8 +1719,73 @@ function App() {
       endsAt: "",
       location: "",
       notes: "",
-      eventType: "study_block"
+      eventType: "study_block",
+      source: "manual"
     });
+  }
+
+  async function updateAssignmentStatus(assignment: AssignmentTask, status: AssignmentTask["status"]) {
+    const updatedAssignment = { ...assignment, status, updatedAt: new Date().toISOString() };
+    setAssignmentTasks((currentAssignments) =>
+      currentAssignments.map((currentAssignment) =>
+        currentAssignment === assignment || (assignment.id && currentAssignment.id === assignment.id)
+          ? updatedAssignment
+          : currentAssignment
+      )
+    );
+
+    try {
+      const response = await fetch("http://localhost:8787/api/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignment: updatedAssignment })
+      });
+      const payload = response.ok ? await response.json() : null;
+      if (payload?.assignment) {
+        setAssignmentTasks((currentAssignments) =>
+          currentAssignments.map((currentAssignment) =>
+            currentAssignment.id === payload.assignment.id ? payload.assignment : currentAssignment
+          )
+        );
+      }
+    } catch {
+      // Local status update remains visible for this session.
+    }
+  }
+
+  async function approveAdvisorStudyPlan() {
+    const studyBlocks = buildStudyPlanEntries(assignmentTasks, advisorResult, courseList);
+    if (studyBlocks.length === 0) return;
+
+    const manualEntries = calendarEntries.filter((entry) => entry.source !== "advisor_study_plan");
+    setCalendarEntries([...studyBlocks, ...manualEntries]);
+    setStudyPlanState({
+      status: "approved",
+      approvedAt: new Date().toISOString(),
+      sourceSignature: studyPlanSignature
+    });
+
+    try {
+      await fetch("http://localhost:8787/api/calendar-events", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "advisor_study_plan" })
+      });
+      await Promise.all(studyBlocks.map((entry) =>
+        fetch("http://localhost:8787/api/calendar-events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: entry })
+        })
+      ));
+      const response = await fetch("http://localhost:8787/api/calendar-events");
+      const payload = response.ok ? await response.json() : null;
+      if (Array.isArray(payload?.events)) {
+        setCalendarEntries(payload.events);
+      }
+    } catch {
+      // Local approved study plan remains available when the watcher/database is unavailable.
+    }
   }
 
   function createNotebookLmPacket() {
@@ -2108,6 +2197,11 @@ function App() {
               <strong>{upcomingCalendarEntries.length}</strong>
               <em>calendar entries</em>
             </div>
+            <div className={studyPlanNeedsRefresh ? "needs-attention" : ""}>
+              <span>Study plan</span>
+              <strong>{studyPlanState.status === "approved" ? approvedStudyBlocks.length : "Draft"}</strong>
+              <em>{studyPlanNeedsRefresh ? "refresh needed" : studyPlanState.status}</em>
+            </div>
             <div>
               <span>Pipeline</span>
               <strong>{applicationList.length}</strong>
@@ -2173,6 +2267,7 @@ function App() {
                       <div key={`dashboard-event-${entry.id || entry.title}`}>
                         <strong>{entry.title}</strong>
                         <span>{entry.courseName || entry.eventType.replace("_", " ")} · {formatCalendarEntryTime(entry)}</span>
+                        {entry.source === "advisor_study_plan" ? <em>Approved study plan</em> : null}
                         {entry.googleEventUrl ? (
                           <a className="text-link" href={entry.googleEventUrl} target="_blank" rel="noreferrer">
                             Add to Google Calendar
@@ -2192,6 +2287,34 @@ function App() {
             </article>
 
             <aside className="dashboard-side-stack">
+              <article className={`overview-panel study-plan-panel ${studyPlanNeedsRefresh ? "needs-attention" : ""}`}>
+                <div className="panel-header">
+                  <div>
+                    <p className="eyebrow">Advisor plan</p>
+                    <h3>Approved study blocks</h3>
+                  </div>
+                  <span className={`provider-pill ${studyPlanState.status === "approved" ? "ok" : "missing_key"}`}>
+                    {studyPlanNeedsRefresh ? "Update needed" : studyPlanState.status}
+                  </span>
+                </div>
+                <strong className="panel-lead">{approvedStudyBlocks.length} blocks on calendar</strong>
+                <p className="panel-note">
+                  {studyPlanNeedsRefresh
+                    ? "Assignments changed since approval. Refresh from Advisor to keep the calendar current."
+                    : studyPlanState.status === "approved"
+                      ? `Approved ${formatStudyPlanApprovedAt(studyPlanState.approvedAt)}.`
+                      : "Run Assignment check-in in Advisor, then approve the plan."}
+                </p>
+                <div className="packet-actions">
+                  <a className="ghost-button" href="#advisor" onClick={() => setAdvisorTask("assignment_checkin")}>
+                    Advisor
+                  </a>
+                  <button className="ghost-button" type="button" onClick={approveAdvisorStudyPlan} disabled={!assignmentTasks.length}>
+                    Refresh plan
+                  </button>
+                </div>
+              </article>
+
               <article className="overview-panel">
                 <div className="panel-header">
                   <div>
@@ -2473,7 +2596,12 @@ function App() {
                       <span>{assignment.courseName} · {formatAssignmentDue(assignment)}</span>
                       <small>{formatAssignmentReading(assignment, courseList)}</small>
                     </div>
-                    <em className={`due-chip ${assignment.priority}`}>{assignment.priority}</em>
+                    <div className="due-actions">
+                      <em className={`due-chip ${assignment.priority}`}>{assignment.priority}</em>
+                      <button className="ghost-button" type="button" onClick={() => void updateAssignmentStatus(assignment, "done")}>
+                        Done
+                      </button>
+                    </div>
                   </article>
                 ))}
                 {upcomingAssignments.length === 0 ? (
@@ -2496,6 +2624,7 @@ function App() {
                     <div>
                       <strong>{entry.title}</strong>
                       <span>{entry.courseName || entry.eventType.replace("_", " ")} · {formatCalendarEntryTime(entry)}</span>
+                      {entry.source === "advisor_study_plan" ? <small>Approved study plan</small> : null}
                       {entry.location ? <small>{entry.location}</small> : null}
                     </div>
                     {entry.googleEventUrl ? (
@@ -3312,6 +3441,21 @@ function App() {
                   <AdvisorList title="Clarifying questions" items={advisorResult.clarifyingQuestions} />
                   <AdvisorList title="Approval checklist" items={advisorResult.approvalChecklist} />
                   <AdvisorList title="Risk notes" items={advisorResult.riskNotes} />
+                  {advisorTask === "assignment_checkin" ? (
+                    <div className={`study-plan-approval ${studyPlanNeedsRefresh ? "needs-attention" : ""}`}>
+                      <div>
+                        <strong>Advisor study plan</strong>
+                        <span>
+                          {studyPlanState.status === "approved"
+                            ? `${approvedStudyBlocks.length} approved study blocks are on the calendar.`
+                            : "Approve the generated study plan to add study blocks to the calendar."}
+                        </span>
+                      </div>
+                      <button className="primary-button" type="button" onClick={approveAdvisorStudyPlan} disabled={!assignmentTasks.length}>
+                        <CheckCircle2 size={16} /> {studyPlanState.status === "approved" ? "Update approved plan" : "Approve study plan"}
+                      </button>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <div className="empty-state">
@@ -3571,6 +3715,15 @@ function loadReminderSettings(): ReminderSettings {
     };
   } catch {
     return defaultReminderSettings;
+  }
+}
+
+function loadStudyPlanState(): StudyPlanState {
+  try {
+    const storedState = window.localStorage.getItem("student-life.study-plan");
+    return storedState ? { ...defaultStudyPlanState, ...JSON.parse(storedState) } : defaultStudyPlanState;
+  } catch {
+    return defaultStudyPlanState;
   }
 }
 
@@ -3845,6 +3998,68 @@ function getUpcomingCalendarEntries(entries: CalendarEntry[]) {
     }));
 }
 
+function getApprovedStudyBlocks(entries: CalendarEntry[]) {
+  return getUpcomingCalendarEntries(entries).filter((entry) => entry.source === "advisor_study_plan");
+}
+
+function getStudyPlanSignature(assignments: AssignmentTask[]) {
+  return assignments
+    .filter((assignment) => assignment.status !== "done" && assignment.status !== "archived")
+    .map((assignment) => [
+      assignment.id || assignment.title,
+      assignment.courseName,
+      assignment.dueAt,
+      assignment.status,
+      assignment.updatedAt || "",
+      assignment.assignedPages || ""
+    ].join("|"))
+    .sort()
+    .join("::");
+}
+
+function buildStudyPlanEntries(assignments: AssignmentTask[], advisorResult: AdvisorResult | null, courses: Lesson[]): CalendarEntry[] {
+  const openAssignments = getUpcomingAssignments(assignments).slice(0, 8);
+  const scheduleBlocks = advisorResult?.scheduleBlocks || [];
+
+  return openAssignments.flatMap((assignment, assignmentIndex) => {
+    const dueDate = parseAssignmentDueDate(assignment);
+    if (!dueDate) return [];
+    const daysBeforeDue = assignment.priority === "high" ? [4, 2, 1] : assignment.priority === "medium" ? [3, 1] : [1];
+
+    return daysBeforeDue.map((daysBefore, blockIndex) => {
+      const startsAt = new Date(dueDate);
+      startsAt.setDate(dueDate.getDate() - daysBefore);
+      startsAt.setHours(blockIndex === 0 ? 18 : 19, 0, 0, 0);
+      const endsAt = new Date(startsAt.getTime() + 75 * 60 * 1000);
+      const advisorBlock = scheduleBlocks[(assignmentIndex + blockIndex) % Math.max(scheduleBlocks.length, 1)] || "";
+      const title = `${assignment.courseName}: ${blockIndex === daysBeforeDue.length - 1 ? "final review" : "study block"} - ${assignment.title}`;
+      const notes = [
+        "Approved advisor study plan.",
+        advisorBlock,
+        formatAssignmentReading(assignment, courses),
+        assignment.details
+      ].filter(Boolean).join("\n\n");
+
+      const entry: CalendarEntry = {
+        assignmentId: assignment.id,
+        title,
+        courseName: assignment.courseName,
+        startsAt: toDateTimeLocalValue(startsAt),
+        endsAt: toDateTimeLocalValue(endsAt),
+        location: "Study plan",
+        notes,
+        eventType: "study_block",
+        source: "advisor_study_plan"
+      };
+
+      return {
+        ...entry,
+        googleEventUrl: buildGoogleCalendarUrl(entry)
+      };
+    });
+  });
+}
+
 function getAssignmentFreshness(assignments: AssignmentTask[], lastCheckedAt?: string) {
   const timestamps = [
     ...assignments.map((assignment) => assignment.updatedAt || assignment.createdAt || assignment.dueAt).filter(Boolean),
@@ -3958,6 +4173,18 @@ function buildGoogleCalendarUrl(entry: Pick<CalendarEntry, "title" | "startsAt" 
     location: entry.location || ""
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function toDateTimeLocalValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatStudyPlanApprovedAt(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function formatAssignmentDue(assignment: AssignmentTask) {
