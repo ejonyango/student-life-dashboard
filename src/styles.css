@@ -721,7 +721,7 @@ button {
 
 .integration-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -739,6 +739,126 @@ button {
 }
 
 .integration-grid span {
+  color: #5e7180;
+}
+
+.navigate-import {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.navigate-schedule,
+.academic-plan {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.navigate-schedule h4,
+.academic-plan h4 {
+  margin: 0;
+}
+
+.schedule-table {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-table article {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) minmax(220px, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.schedule-table span,
+.schedule-table em {
+  color: #5e7180;
+}
+
+.schedule-table em {
+  font-style: normal;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-grid article {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.plan-grid span {
+  display: block;
+  margin-top: 4px;
+  color: #5e7180;
+  font-size: 0.88rem;
+}
+
+.plan-grid ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: #4e5c68;
+}
+
+.navigate-import h4,
+.navigate-import p {
+  margin: 0;
+}
+
+.navigate-import p {
+  color: #5e7180;
+}
+
+.navigate-import textarea {
+  width: 100%;
+  min-height: 130px;
+  padding: 12px;
+  resize: vertical;
+  color: #111827;
+  background: #ffffff;
+  border: 1px solid #cfe6ef;
+  border-radius: 8px;
+}
+
+.navigate-results {
+  display: grid;
+  gap: 10px;
+}
+
+.navigate-results article {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.navigate-results span {
   color: #5e7180;
 }
 
@@ -963,8 +1083,13 @@ button {
   .metric-grid,
   .listing-grid,
   .resume-grid,
-  .integration-grid {
+  .integration-grid,
+  .plan-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-table article {
+    grid-template-columns: 1fr 1fr;
   }
 
   .baseline-card {
@@ -1030,7 +1155,12 @@ button {
   .listing-grid,
   .course-form,
   .resume-grid,
-  .integration-grid {
+  .integration-grid,
+  .plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-table article {
     grid-template-columns: 1fr;
   }
 

@@ -100,6 +100,19 @@ type BaselineResume = {
   skills: string[];
 };
 
+type NavigateItem = {
+  title: string;
+  detail: string;
+  source: "Navigate360";
+};
+
+type AcademicPlanTerm = {
+  term: string;
+  starts: string;
+  credits: number;
+  courses: string[];
+};
+
 type MatchedListing = Listing & {
   matchCount: number;
   matchedTerms: string[];
@@ -255,36 +268,110 @@ const applications: Application[] = [
 
 const initialCourses: Lesson[] = [
   {
-    course: "ECON 303: Intermediate Microeconomics",
-    time: "9:30 AM",
-    task: "Review market structure and elasticity notes",
+    course: "COMM 103: Business & Professional Speaking",
+    time: "Tue | Thu 11:30 AM - 12:45 PM",
+    task: "Section 210 · School of Communication 014",
     intensity: "High",
-    professor: "Dr. Keller",
-    location: "Schreiber Center"
+    location: "School of Communication 014"
   },
   {
-    course: "ACCT 303: Intermediate Accounting I",
-    time: "12:10 PM",
-    task: "Practice financial statement adjustments",
+    course: "ENGL 210: Business Writing",
+    time: "Thu 7:00 PM - 9:30 PM",
+    task: "Section 02W · Writing Intensive",
     intensity: "Medium",
-    professor: "Prof. Nair",
-    location: "Cudahy Science Hall"
+    location: "Corboy Law Center 0426"
   },
   {
-    course: "INFS 346: Database Systems",
-    time: "2:45 PM",
-    task: "SQL schema assignment",
+    course: "FINC 334: Principles of Corporate Finance",
+    time: "Tue | Thu 10:00 AM - 11:15 AM",
+    task: "Section 101 · Registered",
+    intensity: "High",
+    location: "Corboy Law Center 0206"
+  },
+  {
+    course: "INFS 343: Business Analytics",
+    time: "Tue 4:15 PM - 6:45 PM",
+    task: "Section 105 · Registered",
+    intensity: "Medium",
+    location: "Schreiber Center 302"
+  },
+  {
+    course: "INFS 347: Systems Analysis & Design",
+    time: "Tue | Thu 8:30 AM - 9:45 AM",
+    task: "Section 10E · Engaged Learning · Undergraduate Research",
+    intensity: "Medium",
+    location: "Schreiber Center 405"
+  },
+  {
+    course: "THEO 231: Hebrew Bible/Old Testament",
+    time: "Tue | Thu 1:00 PM - 2:15 PM",
+    task: "Section 001 · Tier 2 Theological Knowledge",
     intensity: "Low",
-    professor: "Prof. Alvarez",
-    location: "Damen Student Center"
+    location: "Corboy Law Center L08"
+  }
+];
+
+const navigateAcademicPlan: AcademicPlanTerm[] = [
+  {
+    term: "Fall 2026",
+    starts: "August 24, 2026",
+    credits: 15,
+    courses: [
+      "COMM 103 - Business & Professional Speaking",
+      "ENGL 210 - Business Writing",
+      "FINC 334 - Principles of Corporate Finance",
+      "INFS 343 - Business Analytics",
+      "INFS 347 - Systems Analysis & Design",
+      "THEO 231 - Hebrew Bible/Old Testament"
+    ]
   },
   {
-    course: "ISSCM 241: Business Statistics",
-    time: "4:15 PM",
-    task: "Regression and probability review",
-    intensity: "Medium",
-    professor: "Prof. Chen",
-    location: "Quinlan School of Business"
+    term: "J-term 2027",
+    starts: "January 04, 2027",
+    credits: 3,
+    courses: ["LREB 315 - Law and the Regulatory Environment of Business I"]
+  },
+  {
+    term: "Spring 2027",
+    starts: "January 19, 2027",
+    credits: 15,
+    courses: [
+      "ACCT 317 - Managerial Accounting",
+      "ENVS 101 - The Scientific Basis of Environmental Issues",
+      "ENVS 384 - Conservation Economics",
+      "FINC 335 - Investments",
+      "FINC 337 - Banking, Money & Capital Markets"
+    ]
+  },
+  {
+    term: "Fall 2027",
+    starts: "August 30, 2027",
+    credits: 18,
+    courses: [
+      "ACCT 308 - Accounting Information Systems and Sustainability Reporting",
+      "ENVS 335 - Ecological Economics",
+      "FINC 347 - Financial Institutions",
+      "FINC 356 - Advanced Topics in Investment Banking and Asset Management",
+      "HIST 213 - African History: Themes & Issues",
+      "MGMT 304 - Strategic Management"
+    ]
+  },
+  {
+    term: "J-term 2028",
+    starts: "January 03, 2028",
+    credits: 3,
+    courses: ["MGMT 341 - Ethics in Business"]
+  },
+  {
+    term: "Spring 2028",
+    starts: "January 18, 2028",
+    credits: 12,
+    courses: [
+      "CLST 271 - Classical Mythology",
+      "ECON 328 - Environmental Economics",
+      "ENVS 283 - Environmental Sustainability",
+      "FINC 355 - International Finance Management"
+    ]
   }
 ];
 
@@ -530,6 +617,8 @@ function App() {
   const [resumeProfile, setResumeProfile] = useState<ResumeProfile>(() => loadResumeProfile());
   const [baselineResume, setBaselineResume] = useState<BaselineResume>(() => loadBaselineResume());
   const [keywordInput, setKeywordInput] = useState("Chicago, internship");
+  const [navigateText, setNavigateText] = useState("");
+  const [navigateItems, setNavigateItems] = useState<NavigateItem[]>([]);
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
   const weeklyProgress = Math.min(96, 42 + courseList.length * 9);
@@ -595,6 +684,10 @@ function App() {
       ...currentProfile,
       keywords
     }));
+  }
+
+  function importNavigateText() {
+    setNavigateItems(parseNavigate360Text(navigateText));
   }
 
   return (
@@ -1048,7 +1141,7 @@ function App() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Registered classes</p>
-              <h3>LOCUS and Sakai connection</h3>
+              <h3>LOCUS, Sakai, and Navigate360 connection</h3>
             </div>
             <span className="progress-pill">Authorization needed</span>
           </div>
@@ -1065,12 +1158,89 @@ function App() {
               <strong>Fallback import</strong>
               <span>Eric can upload/export his class schedule while direct access is being configured.</span>
             </article>
+            <article>
+              <strong>Navigate360</strong>
+              <span>Authorized session used to extract Fall 2026 schedule and academic plan terms.</span>
+            </article>
+          </div>
+          <div className="navigate-schedule">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Navigate360 extract</p>
+                <h4>Fall 2026 registered classes</h4>
+              </div>
+              <span className="progress-pill">6 courses</span>
+            </div>
+            <div className="schedule-table">
+              {courseList.map((course) => (
+                <article key={`nav-${course.course}`}>
+                  <strong>{course.course}</strong>
+                  <span>{course.time}</span>
+                  <span>{course.location}</span>
+                  <em>{course.task}</em>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="academic-plan">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Planner</p>
+                <h4>Academic plan from Navigate360</h4>
+              </div>
+              <span className="progress-pill">
+                {navigateAcademicPlan.reduce((total, term) => total + term.credits, 0)} planned credits
+              </span>
+            </div>
+            <div className="plan-grid">
+              {navigateAcademicPlan.map((term) => (
+                <article key={term.term}>
+                  <div>
+                    <strong>{term.term}</strong>
+                    <span>Starts {term.starts} · {term.credits} credits</span>
+                  </div>
+                  <ul>
+                    {term.courses.map((course) => (
+                      <li key={`${term.term}-${course}`}>{course}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="navigate-import">
+            <div>
+              <p className="eyebrow">Authorized Navigate360 import</p>
+              <h4>Paste exported or visible Navigate360 text</h4>
+              <p>
+                Eric should log in himself, then paste schedule, appointment, task, or advising text here.
+                This avoids storing credentials while still letting the dashboard parse useful items.
+              </p>
+            </div>
+            <textarea
+              value={navigateText}
+              onChange={(event) => setNavigateText(event.target.value)}
+              placeholder="Paste Navigate360 appointments, tasks, reminders, or advising notes..."
+            />
+            <button className="primary-button" type="button" onClick={importNavigateText}>
+              <Save size={16} /> Import Navigate360 text
+            </button>
+            {navigateItems.length > 0 ? (
+              <div className="navigate-results">
+                {navigateItems.map((item) => (
+                  <article key={`${item.title}-${item.detail}`}>
+                    <strong>{item.title}</strong>
+                    <span>{item.detail}</span>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="planner-card">
             <ShieldCheck size={18} />
             <span>
-              Because registration records are protected student data, Eric should authorize access.
-              We can connect through official login/export options first, then automate sync where allowed.
+              Because registration and advising records are protected student data, Eric should authorize access.
+              We can use official export/API options first, then automate sync where allowed.
             </span>
           </div>
         </section>
@@ -1111,6 +1281,22 @@ function createBaselineResume(profile: ResumeProfile): BaselineResume {
       ? profile.skills.map((skill) => capitalizeWords(skill))
       : initialBaselineResume.skills
   };
+}
+
+function parseNavigate360Text(text: string): NavigateItem[] {
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 6)
+    .slice(0, 25)
+    .map((line) => {
+      const [title, ...rest] = line.split(/[:|-]/);
+      return {
+        title: title.trim() || "Navigate360 item",
+        detail: rest.join(" - ").trim() || line,
+        source: "Navigate360" as const
+      };
+    });
 }
 
 async function extractPdfText(file: File) {
