@@ -1279,7 +1279,7 @@ function getDeepSeekRoute(task = "application_packet") {
     agent_action: {
       model: providerConfig.deepSeekFastModel,
       thinking: { type: "disabled" },
-      timeoutMs: 20000
+      timeoutMs: 30000
     }
   };
 
@@ -1531,6 +1531,106 @@ async function handleAgentActionGenerate(request, response) {
   }
 }
 
+async function handleAdvisorGenerate(request, response) {
+  const body = await readBody(request);
+  const taskType = body.taskType || "research_advisor";
+  const action = {
+    actionType: taskType === "intelligence_brief" ? "renewable_energy_newsletter" : taskType,
+    subject: body.topic || "Advisor request",
+    body: body.prompt || ""
+  };
+  const newsItems = taskType === "intelligence_brief"
+    ? await fetchRenewableEnergyNews().catch(() => [])
+    : [];
+  const route = getDeepSeekRoute("agent_action");
+  const promptBody = {
+    action,
+    resumeProfile: body.resumeProfile || {},
+    baselineResume: body.baselineResume || {},
+    courses: body.courses || [],
+    newsItems
+  };
+
+  if (!providerConfig.deepSeekKey) {
+    sendJson(response, 200, {
+      status: "missing_key",
+      generatedBy: "Template fallback",
+      model: route.model,
+      message: "DeepSeek is not configured.",
+      result: {
+        subject: action.subject,
+        body: action.body || "Add a prompt, assignment, or topic to generate advisor output.",
+        sections: []
+      }
+    });
+    return;
+  }
+
+  try {
+    const deepSeekResponse = await postJsonWithTimeout(
+      `${providerConfig.deepSeekBaseUrl}/chat/completions`,
+      {
+        Authorization: `Bearer ${providerConfig.deepSeekKey}`,
+        "Content-Type": "application/json"
+      },
+      {
+        model: route.model,
+        messages: [
+          {
+            role: "system",
+            content: "You are Eric Onyango's academic and career research advisor. Return valid JSON only."
+          },
+          {
+            role: "user",
+            content: buildAgentActionPrompt(promptBody, route)
+          }
+        ],
+        thinking: route.thinking,
+        response_format: { type: "json_object" },
+        temperature: 0.35
+      },
+      route.timeoutMs
+    );
+
+    if (!deepSeekResponse.ok) {
+      sendJson(response, 200, {
+        status: "fallback",
+        generatedBy: "Fallback parser",
+        model: route.model,
+        message: `DeepSeek returned ${deepSeekResponse.status}.`,
+        result: {
+          subject: action.subject,
+          body: action.body || "Advisor output unavailable.",
+          sections: []
+        }
+      });
+      return;
+    }
+
+    const payload = JSON.parse(deepSeekResponse.text);
+    const result = parseJsonBlock(payload.choices?.[0]?.message?.content || "{}");
+    sendJson(response, 200, {
+      status: "ok",
+      generatedBy: "DeepSeek",
+      model: route.model,
+      message: `Advisor response generated with ${route.model}.`,
+      result
+    });
+  } catch (error) {
+    sendJson(response, 200, {
+      status: "fallback",
+      generatedBy: "Fallback parser",
+      model: route.model,
+      message: error.message || "Advisor generation failed.",
+      result: {
+        subject: action.subject,
+        body: action.body || "Advisor output unavailable.",
+        sections: []
+      }
+    });
+  }
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     sendJson(response, 200, {});
@@ -1577,6 +1677,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/agent-action-generate" && request.method === "POST") {
       await handleAgentActionGenerate(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/advisor-generate" && request.method === "POST") {
+      await handleAdvisorGenerate(request, response);
       return;
     }
 

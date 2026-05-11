@@ -172,6 +172,20 @@ type AgentAction = {
   createdAt?: string;
 };
 
+type AdvisorTask = "intelligence_brief" | "assignment_checkin" | "research_advisor";
+
+type AdvisorResult = {
+  subject?: string;
+  body?: string;
+  trendThemes?: string[];
+  importantDevelopments?: string[];
+  industryImpacts?: string[];
+  investmentAngles?: string[];
+  sourceNotes?: string[];
+  approvalChecklist?: string[];
+  riskNotes?: string[];
+};
+
 type ApplicationPacket = {
   listing: MatchedListing;
   resumeFocus: string[];
@@ -192,6 +206,7 @@ type Page =
   | "applications"
   | "school"
   | "agents"
+  | "advisor"
   | "social"
   | "resume";
 
@@ -810,6 +825,7 @@ const pageTitles: Record<Page, string> = {
   applications: "Applications",
   school: "School",
   agents: "Agents",
+  advisor: "Advisor",
   social: "Network",
   resume: "Resume"
 };
@@ -845,6 +861,10 @@ function App() {
   const [agentSyncStatus, setAgentSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
   const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
   const [generatingAgentId, setGeneratingAgentId] = useState<string>("");
+  const [advisorTask, setAdvisorTask] = useState<AdvisorTask>("intelligence_brief");
+  const [advisorPrompt, setAdvisorPrompt] = useState("Renewable energy investment trends, project finance, grid constraints, policy, and M&A themes Eric should understand this week.");
+  const [advisorResult, setAdvisorResult] = useState<AdvisorResult | null>(null);
+  const [advisorStatus, setAdvisorStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -1328,6 +1348,41 @@ function App() {
     window.location.hash = "agents";
   }
 
+  async function runAdvisorTask() {
+    setAdvisorStatus("loading");
+
+    try {
+      const response = await fetch("http://localhost:8787/api/advisor-generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          taskType: advisorTask,
+          topic: advisorTask === "intelligence_brief"
+            ? "Renewable energy investing intelligence brief"
+            : advisorTask === "assignment_checkin"
+              ? "Assignment check-in"
+              : "Assignment research advisor",
+          prompt: advisorPrompt,
+          resumeProfile,
+          baselineResume,
+          courses: courseList
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Advisor endpoint returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      setAdvisorResult(payload.result || null);
+      setAdvisorStatus("ready");
+    } catch {
+      setAdvisorStatus("error");
+    }
+  }
+
   async function runLiveJobSearch() {
     setJobSearchState((current) => ({ ...current, status: "loading", error: undefined }));
 
@@ -1573,6 +1628,9 @@ function App() {
           </a>
           <a className={currentPage === "agents" ? "active" : ""} href="#agents">
             <Bot size={18} /> <span>Agents</span>
+          </a>
+          <a className={currentPage === "advisor" ? "active" : ""} href="#advisor">
+            <Sparkles size={18} /> <span>Advisor</span>
           </a>
           <a className={currentPage === "social" ? "active" : ""} href="#social">
             <Network size={18} /> <span>Network</span>
@@ -2287,39 +2345,33 @@ function App() {
               <button
                 className="ghost-button"
                 type="button"
-                onClick={() =>
-                  void createAgentAction({
-                    actionType: "renewable_energy_newsletter",
-                    subject: "Draft renewable energy investing brief",
-                    body: "Create a concise newsletter for Eric with current renewable energy finance, infrastructure, markets, and investment themes. Include source links and why each item matters for a BBA Finance student."
-                  })
-                }
+                onClick={() => {
+                  setAdvisorTask("intelligence_brief");
+                  setCurrentPage("advisor");
+                  window.location.hash = "advisor";
+                }}
               >
                 Renewable investing brief
               </button>
               <button
                 className="ghost-button"
                 type="button"
-                onClick={() =>
-                  void createAgentAction({
-                    actionType: "assignment_checkin",
-                    subject: "Ask Eric for assignment updates",
-                    body: "Review Eric’s saved courses and draft a short check-in asking what assignments, exams, or projects changed this week."
-                  })
-                }
+                onClick={() => {
+                  setAdvisorTask("assignment_checkin");
+                  setCurrentPage("advisor");
+                  window.location.hash = "advisor";
+                }}
               >
                 Assignment check-in
               </button>
               <button
                 className="ghost-button"
                 type="button"
-                onClick={() =>
-                  void createAgentAction({
-                    actionType: "assignment_research_advisor",
-                    subject: "Start assignment research advisor",
-                    body: "Draft an advisor-style response that asks Eric what class and assignment he wants help with, then proposes a research plan using course context."
-                  })
-                }
+                onClick={() => {
+                  setAdvisorTask("research_advisor");
+                  setCurrentPage("advisor");
+                  window.location.hash = "advisor";
+                }}
               >
                 Research advisor
               </button>
@@ -2437,6 +2489,57 @@ function App() {
               >
                 Draft outreach
               </button>
+            </div>
+          </div>
+        </section>
+
+        <section className={`panel advisor-page ${currentPage === "advisor" ? "" : "hidden-page"}`} id="advisor">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Advisor</p>
+              <h3>Research, assignments, and intelligence briefs</h3>
+            </div>
+            <span className={`provider-pill ${advisorStatus === "error" ? "error" : advisorStatus === "ready" ? "ok" : "missing_key"}`}>
+              {advisorStatus === "loading" ? "Generating" : advisorStatus === "ready" ? "Ready" : advisorStatus === "error" ? "Error" : "DeepSeek"}
+            </span>
+          </div>
+          <div className="advisor-grid">
+            <div className="advisor-controls">
+              <label>
+                Advisor mode
+                <select value={advisorTask} onChange={(event) => setAdvisorTask(event.target.value as AdvisorTask)}>
+                  <option value="intelligence_brief">Intelligence brief</option>
+                  <option value="assignment_checkin">Assignment check-in</option>
+                  <option value="research_advisor">Research advisor</option>
+                </select>
+              </label>
+              <label>
+                Topic or question
+                <textarea value={advisorPrompt} onChange={(event) => setAdvisorPrompt(event.target.value)} />
+              </label>
+              <button className="primary-button" type="button" onClick={runAdvisorTask} disabled={advisorStatus === "loading"}>
+                <Sparkles size={16} /> {advisorStatus === "loading" ? "Generating" : "Run advisor"}
+              </button>
+            </div>
+            <div className="advisor-output">
+              {advisorResult ? (
+                <>
+                  <strong>{advisorResult.subject || "Advisor response"}</strong>
+                  <p>{advisorResult.body}</p>
+                  <AdvisorList title="Trend themes" items={advisorResult.trendThemes} />
+                  <AdvisorList title="Important developments" items={advisorResult.importantDevelopments} />
+                  <AdvisorList title="Industry impact" items={advisorResult.industryImpacts} />
+                  <AdvisorList title="Investment angles" items={advisorResult.investmentAngles} />
+                  <AdvisorList title="Source notes" items={advisorResult.sourceNotes} />
+                  <AdvisorList title="Approval checklist" items={advisorResult.approvalChecklist} />
+                  <AdvisorList title="Risk notes" items={advisorResult.riskNotes} />
+                </>
+              ) : (
+                <div className="empty-state">
+                  <strong>Choose a mode and run the advisor.</strong>
+                  <span>Use this page for direct help. It does not create an agent draft unless Eric asks to turn the output into one.</span>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -2852,6 +2955,21 @@ function SocialItem({
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  );
+}
+
+function AdvisorList({ title, items }: { title: string; items?: string[] }) {
+  if (!items?.length) return null;
+
+  return (
+    <div className="advisor-section">
+      <strong>{title}</strong>
+      <ul>
+        {items.map((item) => (
+          <li key={`${title}-${item}`}>{item}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
