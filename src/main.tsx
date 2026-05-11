@@ -82,9 +82,22 @@ type ResumeProfile = {
 type BaselineResume = {
   status: "Draft" | "Approved";
   updatedAt: string;
-  headline: string;
-  summary: string;
-  bullets: string[];
+  name: string;
+  contact: string;
+  education: string[];
+  experience: {
+    company: string;
+    role: string;
+    location: string;
+    dates: string;
+    bullets: string[];
+  }[];
+  activities: {
+    name: string;
+    role: string;
+    bullets: string[];
+  }[];
+  skills: string[];
 };
 
 type MatchedListing = Listing & {
@@ -96,7 +109,7 @@ type MatchedListing = Listing & {
 const defaultResumeProfile: ResumeProfile = {
   fileName: "Eric Onyango Resume.pdf",
   text:
-    "Eric Onyango is a Loyola University Chicago Quinlan School of Business student pursuing a BBA in Finance with minors in Accounting, Information Systems, and Environmental Economics and Sustainability. Skills include Excel, PowerPoint, SQL, Refinitiv Eikon, Grata, valuation, financial modeling, capital markets, treasury, investment research, private placement, M&A, due diligence, market mapping, and financial statements. Experience includes Incoming Finance Intern on Exelon Business Services Treasury and Capital Markets Team, Renewable Advisors Winter Analyst, Project Destined Real Estate Private Equity Intern, Hevesta Capital Search Fund Intern, Rambler Investment Fund analyst, and NABA Treasurer.",
+    "Eric Onyango\nChicago, IL | (972) 352-3118 | eonyango@luc.edu | LinkedIn\n\nEDUCATION\nLoyola University Chicago, Quinlan School of Business, Chicago, IL\nBBA in Finance | Major GPA: 4.0/4.0\nRelevant Coursework: Intermediate Microeconomics (ECON 303), Intermediate Accounting I (ACCT 303), Database Systems (INFS 346), Business Statistics (ISSCM 241)\nMinors: Accounting and Information Systems, Environmental Economics and Sustainability\nDean's List: Fall '24, Spring '26; Class of 2028\n\nPROFESSIONAL EXPERIENCE\nIncoming Summer 2026 Intern - Exelon Business Services, LLC, Chicago, IL\nFinance Intern - Treasury and Capital Markets Team, Summer 2026\n\nRenewable Advisors, New York, NY - Remote\nWinter Analyst, January 2026 - April 2026\n- Supported preparation of capital raising materials for a sustainability focused advisory firm, updating investor presentations, fundraising timelines, and diligence workstreams for private placement mandates.\n- Researched and compiled recent private placement and M&A transactions across climate, infrastructure, and energy transition sectors to support pitch materials and investor outreach strategy.\n- Assisted in preparing investor presentation materials evaluating an African agribusiness platform's $80M+ recapitalization strategy, including operating forecasts, CapEx deployment, margin expansion, and capital markets funding alternatives.\n\nProject Destined, Remote\nReal Estate Private Equity Intern, December 2025 - February 2026\n- Underwrote three multifamily investments through a selective real estate private equity training program.\n\nHevesta Capital, Albuquerque, NM - Remote\nSearch Fund Intern, February 2025 - July 2025\n- Generated 15 proprietary acquisition leads through thematic sourcing across founder owned lower middle market businesses in climate adjacent sectors.\n- Conducted market mapping of 400+ CPA firms and intermediaries to expand referral channels and origination pipeline.\n- Analyzed ownership structures, financial profiles, and valuation benchmarks across target companies to support preliminary diligence and investment prioritization.\n\nACTIVITIES & INVOLVEMENT\nRambler Investment Fund, Student Managed Investment Fund: $1.5M AUM, Chicago, IL\nAnalyst, August 2024 - Present\n- Evaluated Energy, Technology Hardware, and Healthcare equities using valuation, catalysts, and macro trends.\n- Built investment theses through analysis of 10-Ks, 10-Qs, financial statements, and cash flow models with Refinitiv Eikon.\n\nGlobal Case Competition at Harvard - Rambler Investment Fund, March 2025\n- Selected to present M&A strategy recommendations in international case competition.\n\nAnalyst Development Program - Banking and Capital Markets Group, January 2025 - Present\n- Trained in 3-statement modeling, accounting ratios, valuation methods, and advanced Excel.\n\nNational Association of Black Accountants, Chicago, IL\nTreasurer, August 2025 - Present\n- Managed chapter budget, allocating funds for professional events, travel, and initiatives.\n\nAWARDS, SKILLS & INTERESTS\nAwards: MTWW Scholar 2025, Regents Scholarship, Jesuit Heritage Scholarship\nSkills: Excel, PowerPoint, SQL, Refinitiv Eikon, Grata\nInterests: Phanerozoic Time Period, North American Mythology, Fishkeeping, Basketball, Cinematography",
   skills: [
     "excel",
     "powerpoint",
@@ -133,15 +146,80 @@ const defaultResumeProfile: ResumeProfile = {
 const initialBaselineResume: BaselineResume = {
   status: "Draft",
   updatedAt: "May 11, 2026",
-  headline: "Finance student focused on capital markets, valuation, and investment research",
-  summary:
-    "Loyola University Chicago BBA Finance student with accounting and information systems depth, hands-on investment research, private placement support, real estate private equity underwriting, search fund sourcing, and capital markets preparation.",
-  bullets: [
-    "Supported capital raising materials and investor presentation workstreams for sustainability-focused private placement mandates.",
-    "Researched private placement and M&A transactions across climate, infrastructure, and energy transition sectors.",
-    "Underwrote multifamily investments and analyzed ownership structures, valuation benchmarks, and acquisition leads.",
-    "Evaluated public equities using valuation, catalysts, macro trends, filings, financial statements, cash flow models, and Refinitiv Eikon."
-  ]
+  name: "Eric Onyango",
+  contact: "Chicago, IL | (972) 352-3118 | eonyango@luc.edu | LinkedIn",
+  education: [
+    "Loyola University Chicago, Quinlan School of Business - BBA in Finance, Class of 2028",
+    "Major GPA: 4.0/4.0; Minors in Accounting and Information Systems, Environmental Economics and Sustainability",
+    "Relevant Coursework: Intermediate Microeconomics, Intermediate Accounting I, Database Systems, Business Statistics"
+  ],
+  experience: [
+    {
+      company: "Exelon Business Services, LLC",
+      role: "Incoming Finance Intern - Treasury and Capital Markets Team",
+      location: "Chicago, IL",
+      dates: "Summer 2026",
+      bullets: [
+        "Incoming finance intern supporting treasury and capital markets workstreams."
+      ]
+    },
+    {
+      company: "Renewable Advisors",
+      role: "Winter Analyst",
+      location: "New York, NY - Remote",
+      dates: "January 2026 - April 2026",
+      bullets: [
+        "Prepared capital raising materials for sustainability-focused advisory mandates, including investor presentations, fundraising timelines, and diligence workstreams.",
+        "Researched private placement and M&A transactions across climate, infrastructure, and energy transition sectors to support pitch materials and investor outreach.",
+        "Supported analysis of an African agribusiness platform's $80M+ recapitalization strategy, including operating forecasts, CapEx deployment, margin expansion, and funding alternatives."
+      ]
+    },
+    {
+      company: "Project Destined",
+      role: "Real Estate Private Equity Intern",
+      location: "Remote",
+      dates: "December 2025 - February 2026",
+      bullets: [
+        "Underwrote three multifamily investments through a selective real estate private equity training program."
+      ]
+    },
+    {
+      company: "Hevesta Capital",
+      role: "Search Fund Intern",
+      location: "Albuquerque, NM - Remote",
+      dates: "February 2025 - July 2025",
+      bullets: [
+        "Generated 15 proprietary acquisition leads through thematic sourcing across founder-owned lower middle market businesses in climate-adjacent sectors.",
+        "Mapped 400+ CPA firms and intermediaries to expand referral channels and origination pipeline.",
+        "Analyzed ownership structures, financial profiles, and valuation benchmarks to support preliminary diligence and investment prioritization."
+      ]
+    }
+  ],
+  activities: [
+    {
+      name: "Rambler Investment Fund",
+      role: "Analyst",
+      bullets: [
+        "Evaluated Energy, Technology Hardware, and Healthcare equities using valuation, catalysts, macro trends, filings, financial statements, and cash flow models with Refinitiv Eikon.",
+        "Selected to present M&A strategy recommendations in the Global Case Competition at Harvard."
+      ]
+    },
+    {
+      name: "Analyst Development Program - Banking and Capital Markets Group",
+      role: "Participant",
+      bullets: [
+        "Trained in 3-statement modeling, accounting ratios, valuation methods, and advanced Excel."
+      ]
+    },
+    {
+      name: "National Association of Black Accountants",
+      role: "Treasurer",
+      bullets: [
+        "Managed chapter budget and allocated funds for professional events, travel, and initiatives."
+      ]
+    }
+  ],
+  skills: ["Excel", "PowerPoint", "SQL", "Refinitiv Eikon", "Grata", "Valuation", "Financial Modeling", "Capital Markets"]
 };
 
 const applications: Application[] = [
@@ -623,18 +701,23 @@ function App() {
         <section className="panel resume-intake" id="resume">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Resume inbox</p>
-              <h3>Eric’s resume memory</h3>
+              <p className="eyebrow">Resume workspace</p>
+              <h3>Eric’s current and baseline resumes</h3>
             </div>
             <span className="progress-pill">{resumeProfile.skills.length} saved skills</span>
           </div>
-          <div className="resume-grid">
-            <label className="upload-box">
-              <FileText size={22} />
-              <strong>Upload Eric’s latest resume</strong>
-              <span>Upload a PDF, text, or markdown resume.</span>
+          <div className="resume-maintenance">
+            <div>
+              <strong>Resume updates</strong>
+              <span>Use this only when Eric has a newer resume. The approved baseline remains the operating resume until he approves a replacement.</span>
+            </div>
+            <label className="compact-upload">
+              <RefreshCw size={16} />
+              Replace resume
               <input type="file" accept=".pdf,.txt,.md,.text" onChange={handleResumeUpload} />
             </label>
+          </div>
+          <div className="resume-grid">
             <div className="resume-summary">
               <span>Current resume</span>
               <strong>{resumeProfile.fileName}</strong>
@@ -646,6 +729,13 @@ function App() {
                 ))}
               </div>
             </div>
+            <div className="resume-document">
+              <div className="document-topline">
+                <span>Uploaded resume</span>
+                <strong>Full text</strong>
+              </div>
+              <pre>{resumeProfile.text}</pre>
+            </div>
             <div className="baseline-card">
               <div className="baseline-topline">
                 <span>AI baseline resume</span>
@@ -653,13 +743,7 @@ function App() {
                   {baselineResume.status}
                 </strong>
               </div>
-              <h4>{baselineResume.headline}</h4>
-              <p>{baselineResume.summary}</p>
-              <ul>
-                {baselineResume.bullets.slice(0, 4).map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
+              <ResumeDocument resume={baselineResume} />
               <div className="baseline-actions">
                 <button
                   className="primary-button"
@@ -1019,18 +1103,13 @@ function loadBaselineResume(): BaselineResume {
 }
 
 function createBaselineResume(profile: ResumeProfile): BaselineResume {
-  const skills = profile.skills.slice(0, 6).join(", ");
-  const experience = profile.experience.slice(0, 4);
-
   return {
+    ...initialBaselineResume,
     status: "Draft",
     updatedAt: "May 11, 2026",
-    headline: `${capitalizeWords(profile.major || "Finance")} student focused on ${skills || "career-aligned internship roles"}`,
-    summary:
-      "AI-assisted baseline drafted from Eric's current resume. It is intended to be reviewed and approved before any automated application or job-specific tailoring workflow uses it.",
-    bullets: experience.length
-      ? experience.map((signal) => `Position experience around ${signal} for finance, advisory, and capital markets internship applications.`)
-      : initialBaselineResume.bullets
+    skills: profile.skills.length
+      ? profile.skills.map((skill) => capitalizeWords(skill))
+      : initialBaselineResume.skills
   };
 }
 
@@ -1138,6 +1217,62 @@ function SocialItem({
       <div>{icon}</div>
       <span>{label}</span>
       <strong>{value}</strong>
+    </article>
+  );
+}
+
+function ResumeDocument({ resume }: { resume: BaselineResume }) {
+  return (
+    <article className="baseline-document">
+      <header>
+        <h4>{resume.name}</h4>
+        <p>{resume.contact}</p>
+      </header>
+
+      <section>
+        <h5>Education</h5>
+        {resume.education.map((item) => (
+          <p key={item}>{item}</p>
+        ))}
+      </section>
+
+      <section>
+        <h5>Professional Experience</h5>
+        {resume.experience.map((role) => (
+          <div className="resume-role" key={`${role.company}-${role.role}`}>
+            <div>
+              <strong>{role.company}</strong>
+              <span>{role.location} · {role.dates}</span>
+            </div>
+            <em>{role.role}</em>
+            <ul>
+              {role.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+
+      <section>
+        <h5>Activities & Involvement</h5>
+        {resume.activities.map((activity) => (
+          <div className="resume-role" key={activity.name}>
+            <strong>{activity.name}</strong>
+            <em>{activity.role}</em>
+            <ul>
+              {activity.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+
+      <section>
+        <h5>Skills</h5>
+        <p>{resume.skills.join(", ")}</p>
+      </section>
     </article>
   );
 }

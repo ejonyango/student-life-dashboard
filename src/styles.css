@@ -396,13 +396,13 @@ button {
 
 .resume-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 0.8fr) minmax(280px, 1fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.1fr) minmax(420px, 1.35fr);
   gap: 14px;
 }
 
-.upload-box,
 .resume-summary,
-.keyword-box {
+.keyword-box,
+.resume-document {
   display: grid;
   gap: 10px;
   padding: 16px;
@@ -411,20 +411,53 @@ button {
   border-radius: 8px;
 }
 
-.upload-box {
-  place-content: center;
-  min-height: 180px;
-  color: #0b2f47;
-  text-align: center;
-  border-style: dashed;
+.resume-maintenance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
 }
 
-.upload-box input {
-  width: 100%;
-  color: #476576;
+.resume-maintenance strong,
+.resume-maintenance span {
+  display: block;
 }
 
-.upload-box span,
+.resume-maintenance span {
+  margin-top: 3px;
+  color: #5e7180;
+  font-size: 0.9rem;
+}
+
+.compact-upload {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 152px;
+  min-height: 38px;
+  overflow: hidden;
+  color: #0b75a5;
+  font-size: 0.9rem;
+  font-weight: 800;
+  background: #e6f7fd;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.compact-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .resume-summary span,
 .resume-summary p,
 .keyword-box label {
@@ -474,7 +507,8 @@ button {
 .baseline-card {
   display: grid;
   gap: 10px;
-  grid-column: span 3;
+  grid-column: 3;
+  grid-row: span 3;
   padding: 16px;
   background: #fff8fa;
   border: 1px solid #ffd1da;
@@ -512,10 +546,11 @@ button {
 .baseline-card h4 {
   margin: 0;
   color: #0b2f47;
-  font-size: 1.08rem;
+  font-size: 1.35rem;
 }
 
-.baseline-card ul {
+.baseline-card ul,
+.baseline-document ul {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -526,6 +561,87 @@ button {
 .baseline-actions {
   justify-content: flex-start;
   flex-wrap: wrap;
+}
+
+.resume-document {
+  min-height: 420px;
+}
+
+.document-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.document-topline span {
+  color: #476576;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.document-topline strong {
+  color: #0b75a5;
+}
+
+.resume-document pre {
+  max-height: 620px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: #243649;
+  font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.baseline-document {
+  display: grid;
+  gap: 14px;
+  max-height: 760px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.baseline-document header {
+  text-align: center;
+}
+
+.baseline-document header p,
+.baseline-document section p,
+.resume-role span {
+  margin: 4px 0 0;
+  color: #5e7180;
+}
+
+.baseline-document h5 {
+  margin: 0 0 8px;
+  padding-bottom: 5px;
+  color: #0b2f47;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #dceff6;
+}
+
+.resume-role {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.resume-role strong,
+.resume-role span,
+.resume-role em {
+  display: block;
+}
+
+.resume-role em {
+  color: #0b2f47;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .verification-note {
@@ -853,6 +969,7 @@ button {
 
   .baseline-card {
     grid-column: span 2;
+    grid-row: auto;
   }
 
   .application-row {
@@ -919,6 +1036,15 @@ button {
 
   .baseline-card {
     grid-column: span 1;
+  }
+
+  .resume-maintenance {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .compact-upload {
+    width: 100%;
   }
 
   .wide-field {
