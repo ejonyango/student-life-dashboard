@@ -203,6 +203,22 @@ type AssignmentTask = {
   details: string;
   status: "open" | "in_progress" | "done" | "archived";
   priority: "low" | "medium" | "high";
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type ReminderSettings = {
+  enabled: boolean;
+  cadence: "daily" | "weekdays" | "weekly";
+  checkInTime: string;
+  email: string;
+  phone: string;
+  channels: {
+    email: boolean;
+    sms: boolean;
+    push: boolean;
+  };
+  lastCheckedAt?: string;
 };
 
 type ClassNote = {
@@ -885,6 +901,19 @@ const pageTitles: Record<Page, string> = {
   resume: "Resume"
 };
 
+const defaultReminderSettings: ReminderSettings = {
+  enabled: true,
+  cadence: "weekdays",
+  checkInTime: "19:00",
+  email: "",
+  phone: "",
+  channels: {
+    email: true,
+    sms: false,
+    push: true
+  }
+};
+
 function getPageFromHash(): Page {
   const page = window.location.hash.replace("#", "") as Page;
   return pageTitles[page] ? page : "dashboard";
@@ -924,6 +953,7 @@ function App() {
   const [notebookPacket, setNotebookPacket] = useState("");
   const [assignmentTasks, setAssignmentTasks] = useState<AssignmentTask[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(() => loadReminderSettings());
   const [classNotes, setClassNotes] = useState<ClassNote[]>([]);
   const [assignmentForm, setAssignmentForm] = useState<AssignmentTask>({
     courseName: "",
@@ -958,6 +988,7 @@ function App() {
   const totalKnownProgramCourses = completedCourseCount + plannedCourseCount;
   const coursesLeftAfterCurrentTerm = Math.max(0, plannedCourseCount - registeredCourseCount);
   const upcomingAssignments = getUpcomingAssignments(assignmentTasks);
+  const assignmentFreshness = getAssignmentFreshness(assignmentTasks, reminderSettings.lastCheckedAt);
   const calendarDays = buildDueCalendar(calendarMonth, assignmentTasks);
   const calendarMonthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const dueThisMonth = assignmentTasks.filter((assignment) => {
@@ -993,6 +1024,10 @@ function App() {
       window.localStorage.setItem("student-life.job-search", JSON.stringify(jobSearchState));
     }
   }, [jobSearchState]);
+
+  useEffect(() => {
+    window.localStorage.setItem("student-life.assignment-reminders", JSON.stringify(reminderSettings));
+  }, [reminderSettings]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1878,6 +1913,22 @@ function App() {
     setCalendarMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
   }
 
+  function markAssignmentReminderChecked() {
+    setReminderSettings((currentSettings) => ({
+      ...currentSettings,
+      lastCheckedAt: new Date().toISOString()
+    }));
+  }
+
+  async function queueAssignmentDataReminder() {
+    const channels = formatReminderChannels(reminderSettings);
+    await createAgentAction({
+      actionType: "assignment_data_reminder",
+      subject: "Remind Eric to update assignment data",
+      body: `Draft an approval-required reminder asking Eric to enter new assignments, due dates, assigned pages, and textbook readings. Preferred channels: ${channels || "browser dashboard only"}. Current freshness: ${assignmentFreshness.label}.`
+    });
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -2028,6 +2079,15 @@ function App() {
                 : "Add assignments in Advisor or Calendar."}
             </p>
           </article>
+
+          <article className={`command-card reminder ${assignmentFreshness.isStale ? "alert" : ""}`}>
+            <span>Assignment reminder</span>
+            <strong>{assignmentFreshness.label}</strong>
+            <p>{assignmentFreshness.detail}</p>
+            <button className="ghost-button" type="button" onClick={markAssignmentReminderChecked}>
+              Checked today
+            </button>
+          </article>
         </section>
 
         <section className={`metric-grid compact-metrics ${currentPage === "dashboard" ? "" : "hidden-page"}`} aria-label="Student life metrics">
@@ -2039,6 +2099,7 @@ function App() {
           <Metric label="Profile signals" value={String(savedSignalCount)} detail="Skills + experience + keywords" />
           <Metric label="Navigate tasks" value={String(navigateTasks.length)} detail="Checklist + alerts" />
           <Metric label="Upcoming due" value={String(upcomingAssignments.length)} detail="Saved assignment deadlines" />
+          <Metric label="Reminder status" value={assignmentFreshness.isStale ? "Check" : "Current"} detail={assignmentFreshness.label} />
           <Metric
             label="Courses tracked"
             value={String(courseList.length)}
@@ -2082,6 +2143,98 @@ function App() {
                 <span>Add due items in Calendar or Assignment check-in and they will appear here.</span>
               </div>
             ) : null}
+          </article>
+
+          <article className="overview-panel reminder-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Reminder</p>
+                <h3>Assignment data check-in</h3>
+              </div>
+              <span className={`provider-pill ${reminderSettings.enabled ? "ok" : "missing_key"}`}>
+                {reminderSettings.enabled ? "Enabled" : "Paused"}
+              </span>
+            </div>
+            <div className="reminder-status">
+              <Clock3 size={18} />
+              <div>
+                <strong>{assignmentFreshness.label}</strong>
+                <span>{assignmentFreshness.detail}</span>
+              </div>
+            </div>
+            <div className="reminder-form">
+              <label>
+                Cadence
+                <select
+                  value={reminderSettings.cadence}
+                  onChange={(event) =>
+                    setReminderSettings({
+                      ...reminderSettings,
+                      cadence: event.target.value as ReminderSettings["cadence"]
+                    })
+                  }
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Weekdays</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </label>
+              <label>
+                Time
+                <input
+                  type="time"
+                  value={reminderSettings.checkInTime}
+                  onChange={(event) => setReminderSettings({ ...reminderSettings, checkInTime: event.target.value })}
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  value={reminderSettings.email}
+                  onChange={(event) => setReminderSettings({ ...reminderSettings, email: event.target.value })}
+                  placeholder="student@email.edu"
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  value={reminderSettings.phone}
+                  onChange={(event) => setReminderSettings({ ...reminderSettings, phone: event.target.value })}
+                  placeholder="+1 312 555 0100"
+                />
+              </label>
+            </div>
+            <div className="reminder-channel-grid">
+              {(["email", "sms", "push"] as Array<keyof ReminderSettings["channels"]>).map((channel) => (
+                <label key={channel}>
+                  <input
+                    type="checkbox"
+                    checked={reminderSettings.channels[channel]}
+                    onChange={(event) =>
+                      setReminderSettings({
+                        ...reminderSettings,
+                        channels: {
+                          ...reminderSettings.channels,
+                          [channel]: event.target.checked
+                        }
+                      })
+                    }
+                  />
+                  {channel === "sms" ? "SMS" : channel === "push" ? "Browser push" : "Email"}
+                </label>
+              ))}
+            </div>
+            <div className="packet-actions">
+              <button className="primary-button" type="button" onClick={queueAssignmentDataReminder}>
+                <Sparkles size={16} /> Queue reminder draft
+              </button>
+              <button className="ghost-button" type="button" onClick={markAssignmentReminderChecked}>
+                Checked today
+              </button>
+            </div>
+            <p className="integration-note">
+              Email needs a provider such as Resend or SendGrid. SMS needs a provider such as Twilio. Browser push needs a service worker/PWA permission flow.
+            </p>
           </article>
 
           <article className="overview-panel">
@@ -3343,6 +3496,27 @@ function loadJobSearchState(): JobSearchState {
   }
 }
 
+function loadReminderSettings(): ReminderSettings {
+  try {
+    const storedSettings = window.localStorage.getItem("student-life.assignment-reminders");
+    if (!storedSettings) {
+      return defaultReminderSettings;
+    }
+
+    const parsedSettings = JSON.parse(storedSettings) as Partial<ReminderSettings>;
+    return {
+      ...defaultReminderSettings,
+      ...parsedSettings,
+      channels: {
+        ...defaultReminderSettings.channels,
+        ...(parsedSettings.channels || {})
+      }
+    };
+  } catch {
+    return defaultReminderSettings;
+  }
+}
+
 function loadApplicationList(): Application[] {
   try {
     const storedApplications = window.localStorage.getItem("student-life.applications");
@@ -3600,6 +3774,48 @@ function getUpcomingAssignments(assignments: AssignmentTask[]) {
     .filter((entry): entry is { assignment: AssignmentTask; dueDate: Date } => entry.dueDate !== null && entry.dueDate >= now)
     .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
     .map((entry) => entry.assignment);
+}
+
+function getAssignmentFreshness(assignments: AssignmentTask[], lastCheckedAt?: string) {
+  const timestamps = [
+    ...assignments.map((assignment) => assignment.updatedAt || assignment.createdAt || assignment.dueAt).filter(Boolean),
+    lastCheckedAt || ""
+  ].filter(Boolean);
+  const latestTimestamp = timestamps
+    .map((timestamp) => new Date(timestamp).getTime())
+    .filter((time) => !Number.isNaN(time))
+    .sort((a, b) => b - a)[0];
+
+  if (!latestTimestamp) {
+    return {
+      isStale: true,
+      label: "Assignment data needed",
+      detail: "No assignment entries have been saved yet. Ask Eric to enter current coursework, readings, and due dates."
+    };
+  }
+
+  const daysOld = Math.floor((Date.now() - latestTimestamp) / 86400000);
+  if (daysOld >= 3) {
+    return {
+      isStale: true,
+      label: `${daysOld} days since update`,
+      detail: "Ask Eric to confirm whether new assignments, readings, or exam dates were announced."
+    };
+  }
+
+  return {
+    isStale: false,
+    label: daysOld === 0 ? "Updated today" : `Updated ${daysOld} day${daysOld === 1 ? "" : "s"} ago`,
+    detail: "Calendar data is fresh enough for dashboard planning."
+  };
+}
+
+function formatReminderChannels(settings: ReminderSettings) {
+  return [
+    settings.channels.email && settings.email ? `email ${settings.email}` : "",
+    settings.channels.sms && settings.phone ? `SMS ${settings.phone}` : "",
+    settings.channels.push ? "browser push" : ""
+  ].filter(Boolean).join(", ");
 }
 
 function buildDueCalendar(monthDate: Date, assignments: AssignmentTask[]): CalendarDueDay[] {

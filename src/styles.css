@@ -385,6 +385,14 @@ button {
   border-left: 4px solid #41b6e6;
 }
 
+.command-card.reminder {
+  border-left: 4px solid #0b75a5;
+}
+
+.command-card.reminder .ghost-button {
+  width: fit-content;
+}
+
 .dashboard-overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -453,6 +461,76 @@ button {
   color: #0b75a5;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.reminder-panel {
+  border-top: 4px solid #41b6e6;
+}
+
+.reminder-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  color: #0b2f47;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 8px;
+}
+
+.reminder-status div {
+  display: grid;
+  gap: 4px;
+}
+
+.reminder-status span,
+.integration-note {
+  color: #5e7180;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.reminder-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reminder-form label {
+  display: grid;
+  gap: 6px;
+  color: #476576;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.reminder-form input,
+.reminder-form select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  color: #111827;
+  background: #ffffff;
+  border: 1px solid #cfe6ef;
+  border-radius: 8px;
+}
+
+.reminder-channel-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reminder-channel-grid label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: #0b2f47;
+  font-size: 0.84rem;
+  font-weight: 800;
+  background: #e6f7fd;
+  border-radius: 999px;
 }
 
 .text-link {
@@ -2002,6 +2080,10 @@ button.application-link {
   }
 
   .dashboard-due-row {
+    grid-template-columns: 1fr;
+  }
+
+  .reminder-form {
     grid-template-columns: 1fr;
   }
 
