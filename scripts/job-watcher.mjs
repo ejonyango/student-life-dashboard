@@ -471,9 +471,42 @@ async function saveCourseRecord(course) {
   return { ok: true, saved: true, course: mapCourseRow(result.rows[0]) };
 }
 
+async function deleteCourseRecord(course) {
+  const pool = getDbPool();
+  if (!pool) {
+    return { ok: false, deleted: false, reason: "database_not_configured" };
+  }
+
+  const result = await pool.query(
+    `
+      delete from public.course_records
+      using public.student_profiles
+      where course_records.student_id = student_profiles.id
+        and student_profiles.slug = 'eric-onyango'
+        and (
+          ($1::uuid is not null and course_records.id = $1::uuid)
+          or ($1::uuid is null and course_records.course_name = $2)
+        )
+      returning course_records.id
+    `,
+    [
+      course.id || null,
+      course.course || ""
+    ]
+  );
+
+  return { ok: true, deleted: result.rowCount > 0 };
+}
+
 async function handleCourses(request, response) {
   if (request.method === "GET") {
     sendJson(response, 200, await listCourseRecords());
+    return;
+  }
+
+  if (request.method === "DELETE") {
+    const body = await readBody(request);
+    sendJson(response, 200, await deleteCourseRecord(body));
     return;
   }
 
@@ -1243,7 +1276,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (url.pathname === "/api/courses" && (request.method === "GET" || request.method === "POST")) {
+    if (url.pathname === "/api/courses" && (request.method === "GET" || request.method === "POST" || request.method === "DELETE")) {
       await handleCourses(request, response);
       return;
     }

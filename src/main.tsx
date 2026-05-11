@@ -47,6 +47,7 @@ type Application = {
 };
 
 type Lesson = {
+  id?: string;
   course: string;
   time: string;
   task: string;
@@ -829,6 +830,7 @@ function App() {
   const [applicationPacket, setApplicationPacket] = useState<ApplicationPacket | null>(null);
   const [packetStatus, setPacketStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [applicationSyncStatus, setApplicationSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
+  const [schoolSyncStatus, setSchoolSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -908,15 +910,21 @@ function App() {
     async function syncCoursesFromDatabase() {
       try {
         const response = await fetch("http://localhost:8787/api/courses");
-        if (!response.ok) return;
+        if (!response.ok) {
+          setSchoolSyncStatus("error");
+          return;
+        }
 
         const payload = await response.json();
-        if (!isMounted || !Array.isArray(payload.courses) || payload.courses.length === 0) {
+        if (!isMounted || !Array.isArray(payload.courses)) {
+          setSchoolSyncStatus("error");
           return;
         }
 
         setCourseList(payload.courses);
+        setSchoolSyncStatus(payload.database ? "database" : "local");
       } catch {
+        setSchoolSyncStatus("local");
         // Local course data remains the fallback when Supabase is offline.
       }
     }
@@ -1047,6 +1055,29 @@ function App() {
       });
     } catch {
       // Local course data remains the fallback when the watcher/database is unavailable.
+    }
+  }
+
+  async function removeCourse(lesson: Lesson) {
+    setCourseList((currentCourses) =>
+      currentCourses.filter((course) =>
+        lesson.id ? course.id !== lesson.id : course.course !== lesson.course
+      )
+    );
+
+    try {
+      await fetch("http://localhost:8787/api/courses", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          id: lesson.id,
+          course: lesson.course
+        })
+      });
+    } catch {
+      // Local removal remains the fallback when the watcher/database is unavailable.
     }
   }
 
@@ -1903,40 +1934,24 @@ function App() {
           ) : null}
         </section>
 
-        <section className={`two-column ${currentPage === "school" ? "" : "hidden-page"}`}>
-          <div className="panel dashboard-courses">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Quinlan courses</p>
-                <h3>Finance coursework</h3>
-              </div>
-              <span className="progress-pill">{weeklyProgress}% planned</span>
-            </div>
-            <div className="lesson-list">
-              {courseList.map((lesson) => (
-                <article className="lesson-row" key={`dashboard-${lesson.course}`}>
-                  <div className={`lesson-dot ${lesson.intensity.toLowerCase()}`} />
-                  <div>
-                    <strong>{lesson.course}</strong>
-                    <span>{lesson.time} · {lesson.task}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="planner-card">
-              <CheckCircle2 size={18} />
-              <span>Courses added in School appear here immediately.</span>
-            </div>
-          </div>
-        </section>
-
         <section className={`panel school-editor ${currentPage === "school" ? "" : "hidden-page"}`} id="school">
           <div className="panel-header">
             <div>
               <p className="eyebrow">School</p>
-              <h3>Eric’s course planner</h3>
+              <h3>Eric’s registered courses</h3>
             </div>
-            <span className="progress-pill">{courseList.length} courses</span>
+            <div className="panel-actions">
+              <span className={`provider-pill ${schoolSyncStatus === "database" ? "ok" : schoolSyncStatus === "error" ? "error" : "missing_key"}`}>
+                {schoolSyncStatus === "database"
+                  ? "Supabase synced"
+                  : schoolSyncStatus === "loading"
+                    ? "Syncing"
+                    : schoolSyncStatus === "error"
+                      ? "Sync issue"
+                      : "Local fallback"}
+              </span>
+              <span className="progress-pill">{courseList.length} courses</span>
+            </div>
           </div>
           <form className="course-form" onSubmit={addCourse}>
             <label>
@@ -2011,20 +2026,22 @@ function App() {
                 <button
                   className="delete-button"
                   title={`Remove ${lesson.course}`}
-                  onClick={() =>
-                    setCourseList((currentCourses) =>
-                      currentCourses.filter((course) => course.course !== lesson.course)
-                    )
-                  }
+                  onClick={() => void removeCourse(lesson)}
                 >
                   <Trash2 size={16} />
                 </button>
               </article>
             ))}
           </div>
+          {courseList.length === 0 ? (
+            <div className="empty-state">
+              <strong>No registered courses saved yet.</strong>
+              <span>Add Eric’s current courses or import approved Navigate360/LOCUS schedule text.</span>
+            </div>
+          ) : null}
           <div className="planner-card">
             <BookOpen size={18} />
-            <span>Use this section to maintain the school schedule that feeds the Dashboard.</span>
+            <span>Registered/planned courses are loaded from Supabase when available and feed Eric’s Dashboard.</span>
           </div>
         </section>
 
@@ -2087,47 +2104,10 @@ function App() {
         <section className={`panel class-integration ${currentPage === "school" ? "" : "hidden-page"}`}>
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Registered classes</p>
-              <h3>LOCUS, Sakai, and Navigate360 connection</h3>
+              <p className="eyebrow">Academic standing</p>
+              <h3>Progress, plan, and import tools</h3>
             </div>
-            <span className="progress-pill">Authorization needed</span>
-          </div>
-          <div className="integration-grid">
-            <article>
-              <strong>LOCUS schedule</strong>
-              <span>Authoritative source for Eric’s registered semester classes.</span>
-            </article>
-            <article>
-              <strong>Sakai course sites</strong>
-              <span>LMS source for assignments, syllabi, announcements, and course materials.</span>
-            </article>
-            <article>
-              <strong>Fallback import</strong>
-              <span>Eric can upload/export his class schedule while direct access is being configured.</span>
-            </article>
-            <article>
-              <strong>Navigate360</strong>
-              <span>Authorized session used to extract Fall 2026 schedule and academic plan terms.</span>
-            </article>
-          </div>
-          <div className="navigate-schedule">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Navigate360 extract</p>
-                <h4>Fall 2026 registered classes</h4>
-              </div>
-              <span className="progress-pill">6 courses</span>
-            </div>
-            <div className="schedule-table">
-              {courseList.map((course) => (
-                <article key={`nav-${course.course}`}>
-                  <strong>{course.course}</strong>
-                  <span>{course.time}</span>
-                  <span>{course.location}</span>
-                  <em>{course.task}</em>
-                </article>
-              ))}
-            </div>
+            <span className="progress-pill">{academicStanding.gpaLabel} {academicStanding.gpa}</span>
           </div>
           <div className="completed-course-history">
             <div className="panel-header">
@@ -2135,7 +2115,6 @@ function App() {
                 <p className="eyebrow">Completed coursework</p>
                 <h4>GPA and prior course history</h4>
               </div>
-              <span className="progress-pill">{academicStanding.gpaLabel} {academicStanding.gpa}</span>
             </div>
             <div className="academic-snapshot wide">
               <div>
@@ -2260,8 +2239,7 @@ function App() {
           <div className="planner-card">
             <ShieldCheck size={18} />
             <span>
-              Because registration and advising records are protected student data, Eric should authorize access.
-              We can use official export/API options first, then automate sync where allowed.
+              LOCUS, Sakai, and Navigate360 are protected student systems. Eric should authorize access or paste/export records before they are stored.
             </span>
           </div>
         </section>
