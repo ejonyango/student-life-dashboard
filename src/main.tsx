@@ -60,7 +60,7 @@ type Listing = {
   company: string;
   role: string;
   location: string;
-  sourceBoard: "LinkedIn" | "Handshake" | "Indeed" | "Company Careers";
+  sourceBoard: "LinkedIn" | "Handshake" | "Indeed" | "Company Careers" | "TheirStack" | "SerpApi" | "JobdataAPI";
   sourceDescription: string;
   companyVerification: string;
   applicationLink: string;
@@ -137,6 +137,22 @@ type MatchedListing = Listing & {
   matchCount: number;
   matchedTerms: string[];
   fit: number;
+};
+
+type ProviderStatus = {
+  provider: string;
+  status: "ok" | "missing_key" | "error";
+  message: string;
+  count: number;
+};
+
+type JobSearchState = {
+  status: "idle" | "loading" | "success" | "error";
+  listings: Listing[];
+  checkedAt: string;
+  query: string;
+  providerStatus: ProviderStatus[];
+  error?: string;
 };
 
 type Page =
@@ -788,10 +804,18 @@ function App() {
   const [keywordInput, setKeywordInput] = useState("Chicago, internship");
   const [navigateText, setNavigateText] = useState("");
   const [navigateItems, setNavigateItems] = useState<NavigateItem[]>([]);
+  const [jobSearchState, setJobSearchState] = useState<JobSearchState>({
+    status: "idle",
+    listings: [],
+    checkedAt: "",
+    query: "",
+    providerStatus: []
+  });
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
   const weeklyProgress = Math.min(96, 42 + courseList.length * 9);
-  const matchedListings = getMatchedListings(resumeProfile);
+  const hasLiveListings = jobSearchState.listings.length > 0;
+  const matchedListings = getMatchedListings(resumeProfile, hasLiveListings ? jobSearchState.listings : listings);
   const strongestMatch = matchedListings[0];
   const highPriorityTasks = navigateTasks.filter((task) => task.priority === "High");
   const nextClass = courseList[0];
@@ -867,6 +891,44 @@ function App() {
       ...currentProfile,
       keywords
     }));
+  }
+
+  async function runLiveJobSearch() {
+    setJobSearchState((current) => ({ ...current, status: "loading", error: undefined }));
+
+    try {
+      const response = await fetch("http://localhost:8787/api/job-search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          skills: resumeProfile.skills,
+          experience: resumeProfile.experience,
+          keywords: resumeProfile.keywords,
+          major: resumeProfile.major
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Job watcher returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      setJobSearchState({
+        status: "success",
+        listings: Array.isArray(payload.listings) ? payload.listings : [],
+        checkedAt: payload.checkedAt || new Date().toISOString(),
+        query: payload.query || "",
+        providerStatus: Array.isArray(payload.providerStatus) ? payload.providerStatus : []
+      });
+    } catch (error) {
+      setJobSearchState((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : "Unable to reach the local job watcher."
+      }));
+    }
   }
 
   function importNavigateText() {
@@ -1206,7 +1268,12 @@ function App() {
               <p className="eyebrow">Available listings</p>
               <h3>Resume-matched internship leads</h3>
             </div>
-            <span className="progress-pill">{matchedListings.length} of 500 max</span>
+            <div className="panel-actions">
+              <button className="primary-button" type="button" onClick={runLiveJobSearch} disabled={jobSearchState.status === "loading"}>
+                <Search size={16} /> {jobSearchState.status === "loading" ? "Checking APIs" : "Check live APIs"}
+              </button>
+              <span className="progress-pill">{matchedListings.length} of 500 max</span>
+            </div>
           </div>
           <div className="verification-note">
             <CheckCircle2 size={18} />
@@ -1214,6 +1281,35 @@ function App() {
               Listings appear only when at least two resume skills, experience points, major terms,
               or saved keywords correlate with the role. The list is capped at 500.
             </span>
+          </div>
+          <div className="job-watcher-panel">
+            <div>
+              <strong>{hasLiveListings ? "Live API results" : "Sample listings showing matcher behavior"}</strong>
+              <span>
+                {jobSearchState.checkedAt
+                  ? `Last checked ${formatCheckedAt(jobSearchState.checkedAt)} with query: ${jobSearchState.query}`
+                  : "Start the local watcher, add provider keys, then run a live check."}
+              </span>
+            </div>
+            <div className="provider-grid">
+              {jobSearchState.providerStatus.length > 0 ? (
+                jobSearchState.providerStatus.map((provider) => (
+                  <span className={`provider-pill ${provider.status}`} key={provider.provider}>
+                    {provider.provider}: {provider.status === "ok" ? `${provider.count} jobs` : provider.status.replace("_", " ")}
+                  </span>
+                ))
+              ) : (
+                <>
+                  <span className="provider-pill missing_key">TheirStack: not checked</span>
+                  <span className="provider-pill missing_key">SerpApi: not checked</span>
+                  <span className="provider-pill missing_key">JobdataAPI: not checked</span>
+                </>
+              )}
+            </div>
+            {jobSearchState.error ? <p className="watcher-error">{jobSearchState.error}</p> : null}
+            {jobSearchState.providerStatus.some((provider) => provider.status === "missing_key") ? (
+              <p className="watcher-error">Add keys to a local .env or shell environment, then run npm run job-watcher.</p>
+            ) : null}
           </div>
           <div className="listing-grid">
             {matchedListings.map((listing) => (
@@ -1738,7 +1834,7 @@ function normalizeTerms(value: string) {
     .filter(Boolean);
 }
 
-function getMatchedListings(profile: ResumeProfile): MatchedListing[] {
+function getMatchedListings(profile: ResumeProfile, sourceListings: Listing[] = listings): MatchedListing[] {
   const profileTerms = [
     ...profile.skills,
     ...profile.experience,
@@ -1746,7 +1842,7 @@ function getMatchedListings(profile: ResumeProfile): MatchedListing[] {
     profile.major
   ].filter(Boolean);
 
-  return listings
+  return sourceListings
     .map((listing) => {
       const listingTerms = [
         ...listing.skills,
@@ -1775,6 +1871,17 @@ function getMatchedListings(profile: ResumeProfile): MatchedListing[] {
     .filter((listing) => listing.matchCount >= 2)
     .sort((a, b) => b.matchCount - a.matchCount || b.fit - a.fit)
     .slice(0, 500);
+}
+
+function formatCheckedAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {

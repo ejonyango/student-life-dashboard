@@ -184,6 +184,11 @@ button {
   background: #0b75a5;
 }
 
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .ghost-button {
   padding: 0 12px;
   color: #0b75a5;
@@ -839,6 +844,69 @@ button {
   color: #0b2f47;
   background: #e6f7fd;
   border-radius: 8px;
+}
+
+.job-watcher-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #d8edf5;
+  border-radius: 8px;
+}
+
+.job-watcher-panel strong,
+.job-watcher-panel span {
+  display: block;
+}
+
+.job-watcher-panel > div:first-child span {
+  margin-top: 4px;
+  color: #5e7180;
+  font-size: 0.92rem;
+}
+
+.provider-grid,
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-pill {
+  padding: 7px 10px;
+  color: #0b2f47;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: #f7fcff;
+  border: 1px solid #dceff6;
+  border-radius: 999px;
+}
+
+.provider-pill.ok {
+  color: #0a5538;
+  background: #e6f8ef;
+  border-color: #bfe8d4;
+}
+
+.provider-pill.error {
+  color: #8b001a;
+  background: #ffe8ed;
+  border-color: #ffc3cf;
+}
+
+.provider-pill.missing_key {
+  color: #5e4b00;
+  background: #fff8d7;
+  border-color: #f2df89;
+}
+
+.watcher-error {
+  margin: 0;
+  color: #8b001a;
+  font-size: 0.9rem;
 }
 
 .listing-grid {
