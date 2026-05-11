@@ -828,6 +828,7 @@ function App() {
   const [applicationList, setApplicationList] = useState<Application[]>(() => loadApplicationList());
   const [applicationPacket, setApplicationPacket] = useState<ApplicationPacket | null>(null);
   const [packetStatus, setPacketStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [applicationSyncStatus, setApplicationSyncStatus] = useState<"loading" | "database" | "local" | "error">("loading");
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
   const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
@@ -875,15 +876,21 @@ function App() {
     async function syncApplicationsFromDatabase() {
       try {
         const response = await fetch("http://localhost:8787/api/applications");
-        if (!response.ok) return;
+        if (!response.ok) {
+          setApplicationSyncStatus("error");
+          return;
+        }
 
         const payload = await response.json();
-        if (!isMounted || !Array.isArray(payload.applications) || payload.applications.length === 0) {
+        if (!isMounted || !Array.isArray(payload.applications)) {
+          setApplicationSyncStatus("error");
           return;
         }
 
         setApplicationList(payload.applications);
+        setApplicationSyncStatus(payload.database ? "database" : "local");
       } catch {
+        setApplicationSyncStatus("local");
         // Local storage remains the startup fallback when Supabase is offline.
       }
     }
@@ -1312,6 +1319,12 @@ function App() {
 
     setApplicationPacket(application.packet);
     setPacketStatus("ready");
+    setCurrentPage("available-listings");
+    window.location.hash = "available-listings";
+  }
+
+  function startNewApplication() {
+    setApplicationPacket(null);
     setCurrentPage("available-listings");
     window.location.hash = "available-listings";
   }
@@ -1824,7 +1837,18 @@ function App() {
               <p className="eyebrow">Pipeline</p>
               <h3>Eric’s internship applications</h3>
             </div>
-            <button className="ghost-button">New application</button>
+            <div className="panel-actions">
+              <span className={`provider-pill ${applicationSyncStatus === "database" ? "ok" : applicationSyncStatus === "error" ? "error" : "missing_key"}`}>
+                {applicationSyncStatus === "database"
+                  ? "Supabase synced"
+                  : applicationSyncStatus === "loading"
+                    ? "Syncing"
+                    : applicationSyncStatus === "error"
+                      ? "Sync issue"
+                      : "Local fallback"}
+              </span>
+              <button className="ghost-button" type="button" onClick={startNewApplication}>New application</button>
+            </div>
           </div>
           <div className="application-list">
             {applicationList.map((application) => (
@@ -1871,6 +1895,12 @@ function App() {
               </article>
             ))}
           </div>
+          {applicationList.length === 0 ? (
+            <div className="empty-state">
+              <strong>No saved applications yet.</strong>
+              <span>Use Available Listings to prepare an AI packet, then save the draft into Eric’s pipeline.</span>
+            </div>
+          ) : null}
         </section>
 
         <section className={`two-column ${currentPage === "school" ? "" : "hidden-page"}`}>
