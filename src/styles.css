@@ -939,18 +939,6 @@ button {
   gap: 8px;
 }
 
-button.application-link {
-  width: 100%;
-  padding: 0;
-  color: #0b75a5;
-  font: inherit;
-  font-weight: 800;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
 .listing-topline {
   justify-content: space-between;
 }
@@ -1288,10 +1276,18 @@ button.application-link {
 
 button.application-link {
   width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
   color: #ffffff;
   font: inherit;
   font-weight: 800;
+  background: #e4002b;
   border: 0;
+  border-radius: 8px;
   cursor: pointer;
 }
 
