@@ -54,6 +54,7 @@ type Lesson = {
   intensity: "Low" | "Medium" | "High";
   professor?: string;
   location?: string;
+  textbook?: string;
 };
 
 type Agent = {
@@ -197,6 +198,8 @@ type AssignmentTask = {
   courseName: string;
   title: string;
   dueAt: string;
+  textbook?: string;
+  assignedPages?: string;
   details: string;
   status: "open" | "in_progress" | "done" | "archived";
   priority: "low" | "medium" | "high";
@@ -897,7 +900,8 @@ function App() {
     task: "",
     intensity: "Medium",
     professor: "",
-    location: ""
+    location: "",
+    textbook: ""
   });
   const [resumeProfile, setResumeProfile] = useState<ResumeProfile>(() => loadResumeProfile());
   const [baselineResume, setBaselineResume] = useState<BaselineResume>(() => loadBaselineResume());
@@ -925,6 +929,8 @@ function App() {
     courseName: "",
     title: "",
     dueAt: "",
+    textbook: "",
+    assignedPages: "",
     details: "",
     status: "open",
     priority: "medium"
@@ -1214,7 +1220,8 @@ function App() {
 
     const course = {
       ...courseForm,
-      task: courseForm.task.trim() || "No assignment added yet"
+      task: courseForm.task.trim() || "No assignment added yet",
+      textbook: courseForm.textbook?.trim() || ""
     };
 
     setCourseList((currentCourses) => [...currentCourses, course]);
@@ -1226,7 +1233,8 @@ function App() {
       task: "",
       intensity: "Medium",
       professor: "",
-      location: ""
+      location: "",
+      textbook: ""
     });
   }
 
@@ -1514,7 +1522,9 @@ function App() {
     const assignment = {
       ...assignmentForm,
       courseName: assignmentForm.courseName.trim() || "General",
-      title: assignmentForm.title.trim()
+      title: assignmentForm.title.trim(),
+      textbook: assignmentForm.textbook?.trim() || getCourseTextbook(assignmentForm.courseName, courseList),
+      assignedPages: assignmentForm.assignedPages?.trim() || ""
     };
     setAssignmentTasks((currentTasks) => [assignment, ...currentTasks]);
 
@@ -1538,6 +1548,8 @@ function App() {
       courseName: "",
       title: "",
       dueAt: "",
+      textbook: "",
+      assignedPages: "",
       details: "",
       status: "open",
       priority: "medium"
@@ -1601,7 +1613,7 @@ function App() {
       "## Assignments",
       assignmentTasks.length
         ? assignmentTasks.map((assignment) =>
-          `- ${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}\n  Priority: ${assignment.priority}\n  Details: ${assignment.details || "None"}`
+          `- ${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}\n  Priority: ${assignment.priority}\n  Textbook: ${assignment.textbook || getCourseTextbook(assignment.courseName, courseList) || "Not saved"}\n  Assigned pages: ${assignment.assignedPages || "Not saved"}\n  Details: ${assignment.details || "None"}`
         ).join("\n")
         : "No assignments saved yet.",
       "",
@@ -2171,11 +2183,24 @@ function App() {
             <aside className="calendar-sidebar">
               <form className="advisor-subform" onSubmit={saveAssignmentTask}>
                 <strong>Add due item</strong>
-                <input
+                <select
                   value={assignmentForm.courseName}
-                  onChange={(event) => setAssignmentForm({ ...assignmentForm, courseName: event.target.value })}
-                  placeholder="Course"
-                />
+                  onChange={(event) => {
+                    const courseName = event.target.value;
+                    setAssignmentForm({
+                      ...assignmentForm,
+                      courseName,
+                      textbook: getCourseTextbook(courseName, courseList)
+                    });
+                  }}
+                >
+                  <option value="">Select enrolled course</option>
+                  {courseList.map((course) => (
+                    <option value={course.course} key={`calendar-course-${course.id || course.course}`}>
+                      {course.course}
+                    </option>
+                  ))}
+                </select>
                 <input
                   value={assignmentForm.title}
                   onChange={(event) => setAssignmentForm({ ...assignmentForm, title: event.target.value })}
@@ -2194,6 +2219,16 @@ function App() {
                   <option value="medium">Medium priority</option>
                   <option value="high">High priority</option>
                 </select>
+                <input
+                  value={assignmentForm.textbook || ""}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, textbook: event.target.value })}
+                  placeholder="Textbook in use"
+                />
+                <input
+                  value={assignmentForm.assignedPages || ""}
+                  onChange={(event) => setAssignmentForm({ ...assignmentForm, assignedPages: event.target.value })}
+                  placeholder="Assigned pages, chapters, or sections"
+                />
                 <textarea
                   value={assignmentForm.details}
                   onChange={(event) => setAssignmentForm({ ...assignmentForm, details: event.target.value })}
@@ -2216,6 +2251,7 @@ function App() {
                     <div>
                       <strong>{assignment.title}</strong>
                       <span>{assignment.courseName} · {formatAssignmentDue(assignment)}</span>
+                      <small>{formatAssignmentReading(assignment, courseList)}</small>
                     </div>
                     <em className={`due-chip ${assignment.priority}`}>{assignment.priority}</em>
                   </article>
@@ -2627,6 +2663,14 @@ function App() {
               />
             </label>
             <label className="wide-field">
+              Textbook in use
+              <input
+                value={courseForm.textbook || ""}
+                onChange={(event) => setCourseForm({ ...courseForm, textbook: event.target.value })}
+                placeholder="Textbook title, edition, author, or ISBN"
+              />
+            </label>
+            <label className="wide-field">
               Current assignment or note
               <input
                 value={courseForm.task}
@@ -2661,6 +2705,7 @@ function App() {
                     {lesson.time} · {lesson.task}
                     {lesson.professor ? ` · ${lesson.professor}` : ""}
                     {lesson.location ? ` · ${lesson.location}` : ""}
+                    {lesson.textbook ? ` · Textbook: ${lesson.textbook}` : ""}
                   </span>
                 </div>
                 <button
@@ -2917,11 +2962,24 @@ function App() {
               {advisorTask === "assignment_checkin" ? (
                 <form className="advisor-subform" onSubmit={saveAssignmentTask}>
                   <strong>Add assignment</strong>
-                  <input
+                  <select
                     value={assignmentForm.courseName}
-                    onChange={(event) => setAssignmentForm({ ...assignmentForm, courseName: event.target.value })}
-                    placeholder="Course"
-                  />
+                    onChange={(event) => {
+                      const courseName = event.target.value;
+                      setAssignmentForm({
+                        ...assignmentForm,
+                        courseName,
+                        textbook: getCourseTextbook(courseName, courseList)
+                      });
+                    }}
+                  >
+                    <option value="">Select enrolled course</option>
+                    {courseList.map((course) => (
+                      <option value={course.course} key={`advisor-course-${course.id || course.course}`}>
+                        {course.course}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     value={assignmentForm.title}
                     onChange={(event) => setAssignmentForm({ ...assignmentForm, title: event.target.value })}
@@ -2931,6 +2989,16 @@ function App() {
                     type="datetime-local"
                     value={assignmentForm.dueAt}
                     onChange={(event) => setAssignmentForm({ ...assignmentForm, dueAt: event.target.value })}
+                  />
+                  <input
+                    value={assignmentForm.textbook || ""}
+                    onChange={(event) => setAssignmentForm({ ...assignmentForm, textbook: event.target.value })}
+                    placeholder="Textbook in use"
+                  />
+                  <input
+                    value={assignmentForm.assignedPages || ""}
+                    onChange={(event) => setAssignmentForm({ ...assignmentForm, assignedPages: event.target.value })}
+                    placeholder="Assigned pages, chapters, or sections"
                   />
                   <textarea
                     value={assignmentForm.details}
@@ -3007,7 +3075,7 @@ function App() {
                 <AdvisorList
                   title="Saved assignments"
                   items={assignmentTasks.slice(0, 6).map((assignment) =>
-                    `${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}`
+                    `${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}${formatAssignmentReading(assignment, courseList) ? ` · ${formatAssignmentReading(assignment, courseList)}` : ""}`
                   )}
                 />
               ) : null}
@@ -3533,6 +3601,20 @@ function formatAssignmentDue(assignment: AssignmentTask) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function getCourseTextbook(courseName: string, courses: Lesson[]) {
+  return courses.find((course) => course.course === courseName)?.textbook || "";
+}
+
+function formatAssignmentReading(assignment: AssignmentTask, courses: Lesson[]) {
+  const textbook = assignment.textbook || getCourseTextbook(assignment.courseName, courses);
+  const reading = [
+    textbook ? `Textbook: ${textbook}` : "",
+    assignment.assignedPages ? `Pages: ${assignment.assignedPages}` : ""
+  ].filter(Boolean);
+
+  return reading.join(" · ");
 }
 
 function ResumeDocument({ resume }: { resume: BaselineResume }) {

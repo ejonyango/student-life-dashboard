@@ -743,6 +743,14 @@ button {
   font-size: 0.9rem;
 }
 
+.due-row small {
+  overflow: hidden;
+  color: #476576;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .panel-header.compact {
   margin-bottom: 0;
 }

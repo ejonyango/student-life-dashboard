@@ -410,7 +410,8 @@ function mapCourseRow(row) {
     task: row.raw_payload?.task || "No assignment added yet",
     intensity: row.raw_payload?.intensity || "Medium",
     professor: row.instructor || "",
-    location: row.location || ""
+    location: row.location || "",
+    textbook: row.raw_payload?.textbook || ""
   };
 }
 
@@ -520,6 +521,8 @@ function mapAssignmentRow(row) {
     courseName: row.course_name,
     title: row.title,
     dueAt: row.due_at,
+    textbook: row.textbook || "",
+    assignedPages: row.assigned_pages || "",
     details: row.details || "",
     status: row.status,
     priority: row.priority,
@@ -560,18 +563,22 @@ async function saveAssignment(assignment) {
         course_name,
         title,
         due_at,
+        textbook,
+        assigned_pages,
         details,
         status,
         priority,
         updated_at
       )
-      values ((select id from student), $1, $2, nullif($3, '')::timestamptz, $4, $5, $6, now())
+      values ((select id from student), $1, $2, nullif($3, '')::timestamptz, $4, $5, $6, $7, $8, now())
       returning *
     `,
     [
       assignment.courseName || assignment.course || "General",
       assignment.title || "Untitled assignment",
       assignment.dueAt || "",
+      assignment.textbook || "",
+      assignment.assignedPages || assignment.pages || "",
       assignment.details || "",
       assignment.status || "open",
       assignment.priority || "medium"
@@ -1476,6 +1483,7 @@ function buildAgentActionPrompt(body, route) {
     ] : []),
     ...(isAssignmentCheckin ? [
       "- Use assignment due dates to create a practical action plan to finish work on time.",
+      "- Use textbook and assigned page ranges when provided to make reading and study blocks concrete.",
       "- Break work into schedule blocks ordered by urgency.",
       "- Ask for missing assignment details, rubrics, or due dates when necessary.",
       "- Consider current courses and avoid overloading one day."
