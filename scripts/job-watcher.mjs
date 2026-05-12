@@ -411,7 +411,8 @@ function mapCourseRow(row) {
     intensity: row.raw_payload?.intensity || "Medium",
     professor: row.instructor || "",
     location: row.location || "",
-    textbook: row.raw_payload?.textbook || ""
+    textbook: row.raw_payload?.textbook || "",
+    term: row.term || row.raw_payload?.term || ""
   };
 }
 
@@ -454,17 +455,19 @@ async function saveCourseRecord(course) {
         instructor,
         meeting_pattern,
         location,
+        term,
         raw_payload,
         updated_at
       )
-      values ((select id from student), 'manual', $1, 'registered', $2, $3, $4, $5::jsonb, now())
-      returning id, course_name, instructor, meeting_pattern, location, raw_payload, created_at, updated_at
+      values ((select id from student), 'manual', $1, 'registered', $2, $3, $4, $5, $6::jsonb, now())
+      returning id, course_name, instructor, meeting_pattern, location, term, raw_payload, created_at, updated_at
     `,
     [
       course.course || "Untitled course",
       course.professor || "",
       course.time || "",
       course.location || "",
+      course.term || "",
       JSON.stringify(course)
     ]
   );

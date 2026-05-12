@@ -55,6 +55,7 @@ type Lesson = {
   professor?: string;
   location?: string;
   textbook?: string;
+  term?: string;
 };
 
 type Agent = {
@@ -450,42 +451,48 @@ const initialCourses: Lesson[] = [
     time: "Tue | Thu 11:30 AM - 12:45 PM",
     task: "Section 210 · School of Communication 014",
     intensity: "High",
-    location: "School of Communication 014"
+    location: "School of Communication 014",
+    term: "Fall 2026"
   },
   {
     course: "ENGL 210: Business Writing",
     time: "Thu 7:00 PM - 9:30 PM",
     task: "Section 02W · Writing Intensive",
     intensity: "Medium",
-    location: "Corboy Law Center 0426"
+    location: "Corboy Law Center 0426",
+    term: "Fall 2026"
   },
   {
     course: "FINC 334: Principles of Corporate Finance",
     time: "Tue | Thu 10:00 AM - 11:15 AM",
     task: "Section 101 · Registered",
     intensity: "High",
-    location: "Corboy Law Center 0206"
+    location: "Corboy Law Center 0206",
+    term: "Fall 2026"
   },
   {
     course: "INFS 343: Business Analytics",
     time: "Tue 4:15 PM - 6:45 PM",
     task: "Section 105 · Registered",
     intensity: "Medium",
-    location: "Schreiber Center 302"
+    location: "Schreiber Center 302",
+    term: "Fall 2026"
   },
   {
     course: "INFS 347: Systems Analysis & Design",
     time: "Tue | Thu 8:30 AM - 9:45 AM",
     task: "Section 10E · Engaged Learning · Undergraduate Research",
     intensity: "Medium",
-    location: "Schreiber Center 405"
+    location: "Schreiber Center 405",
+    term: "Fall 2026"
   },
   {
     course: "THEO 231: Hebrew Bible/Old Testament",
     time: "Tue | Thu 1:00 PM - 2:15 PM",
     task: "Section 001 · Tier 2 Theological Knowledge",
     intensity: "Low",
-    location: "Corboy Law Center L08"
+    location: "Corboy Law Center L08",
+    term: "Fall 2026"
   }
 ];
 
@@ -1027,15 +1034,17 @@ function App() {
   });
   const [jobSearchState, setJobSearchState] = useState<JobSearchState>(() => loadJobSearchState());
 
-  const highPriorityCourses = courseList.filter((course) => course.intensity === "High").length;
-  const weeklyProgress = Math.min(96, 42 + courseList.length * 9);
+  const enrolledCourseOptions = getSemesterCourseOptions(courseList, navigateAcademicPlan);
+  const activeTermLabel = getActiveTermLabel(courseList, navigateAcademicPlan);
+  const highPriorityCourses = enrolledCourseOptions.filter((course) => course.intensity === "High").length;
+  const weeklyProgress = Math.min(96, 42 + enrolledCourseOptions.length * 9);
   const hasLiveListings = jobSearchState.listings.length > 0;
   const matchedListings = getMatchedListings(resumeProfile, hasLiveListings ? jobSearchState.listings : listings);
   const strongestMatch = matchedListings[0];
   const highPriorityTasks = navigateTasks.filter((task) => task.priority === "High");
-  const nextClass = courseList[0];
+  const nextClass = enrolledCourseOptions[0];
   const savedSignalCount = resumeProfile.skills.length + resumeProfile.experience.length + resumeProfile.keywords.length;
-  const registeredCourseCount = courseList.length;
+  const registeredCourseCount = enrolledCourseOptions.length;
   const plannedCourseCount = navigateAcademicPlan.reduce((total, term) => total + term.courses.length, 0);
   const completedCourseCount = academicStanding.completedCourses.length;
   const totalKnownProgramCourses = completedCourseCount + plannedCourseCount;
@@ -1207,7 +1216,7 @@ function App() {
           return;
         }
 
-        setCourseList(payload.courses);
+        setCourseList(payload.courses.length ? payload.courses : getNextPlannedTermCourses(navigateAcademicPlan));
         setSchoolSyncStatus(payload.database ? "database" : "local");
       } catch {
         setSchoolSyncStatus("local");
@@ -1519,7 +1528,7 @@ function App() {
           action,
           resumeProfile,
           baselineResume,
-          courses: courseList,
+          courses: enrolledCourseOptions,
           assignments: assignmentTasks,
           classNotes
         })
@@ -1599,7 +1608,7 @@ function App() {
           prompt: advisorPrompt,
           resumeProfile,
           baselineResume,
-          courses: courseList,
+          courses: enrolledCourseOptions,
           assignments: assignmentTasks,
           classNotes
         })
@@ -1625,7 +1634,7 @@ function App() {
       ...assignmentForm,
       courseName: assignmentForm.courseName.trim() || "General",
       title: assignmentForm.title.trim(),
-      textbook: assignmentForm.textbook?.trim() || getCourseTextbook(assignmentForm.courseName, courseList),
+      textbook: assignmentForm.textbook?.trim() || getCourseTextbook(assignmentForm.courseName, enrolledCourseOptions),
       assignedPages: assignmentForm.assignedPages?.trim() || ""
     };
     setAssignmentTasks((currentTasks) => [assignment, ...currentTasks]);
@@ -1769,7 +1778,7 @@ function App() {
   async function approveAdvisorStudyPlan() {
     if (!advisorResult?.studyPlanBlocks?.length) return;
 
-    const studyBlocks = buildStudyPlanEntries(assignmentTasks, advisorResult, courseList);
+    const studyBlocks = buildStudyPlanEntries(assignmentTasks, advisorResult, enrolledCourseOptions);
     if (studyBlocks.length === 0) return;
 
     const manualEntries = calendarEntries.filter((entry) => entry.source !== "advisor_study_plan");
@@ -1823,7 +1832,7 @@ function App() {
       "## Assignments",
       assignmentTasks.length
         ? assignmentTasks.map((assignment) =>
-          `- ${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}\n  Priority: ${assignment.priority}\n  Textbook: ${assignment.textbook || getCourseTextbook(assignment.courseName, courseList) || "Not saved"}\n  Assigned pages: ${assignment.assignedPages || "Not saved"}\n  Details: ${assignment.details || "None"}`
+          `- ${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}\n  Priority: ${assignment.priority}\n  Textbook: ${assignment.textbook || getCourseTextbook(assignment.courseName, enrolledCourseOptions) || "Not saved"}\n  Assigned pages: ${assignment.assignedPages || "Not saved"}\n  Details: ${assignment.details || "None"}`
         ).join("\n")
         : "No assignments saved yet.",
       "",
@@ -2188,7 +2197,7 @@ function App() {
               </h2>
               <p>
                 {upcomingAssignments[0]
-                  ? `${upcomingAssignments[0].courseName} is due ${formatAssignmentDue(upcomingAssignments[0])}. ${formatAssignmentReading(upcomingAssignments[0], courseList) || "Use the Advisor to turn it into a timed work plan."}`
+                  ? `${upcomingAssignments[0].courseName} is due ${formatAssignmentDue(upcomingAssignments[0])}. ${formatAssignmentReading(upcomingAssignments[0], enrolledCourseOptions) || "Use the Advisor to turn it into a timed work plan."}`
                   : strongestMatch
                     ? `${strongestMatch.role} is the strongest current resume match at ${strongestMatch.fit}%.`
                     : "Add assignments, calendar entries, and live job results so the dashboard can prioritize the day."}
@@ -2262,7 +2271,7 @@ function App() {
                         <div>
                           <strong>{assignment.title}</strong>
                           <span>{assignment.courseName}</span>
-                          {formatAssignmentReading(assignment, courseList) ? <em>{formatAssignmentReading(assignment, courseList)}</em> : null}
+                          {formatAssignmentReading(assignment, enrolledCourseOptions) ? <em>{formatAssignmentReading(assignment, enrolledCourseOptions)}</em> : null}
                         </div>
                         <span className={`due-chip ${assignment.priority}`}>{assignment.priority}</span>
                       </article>
@@ -2405,12 +2414,12 @@ function App() {
               <div className="panel-header">
                 <div>
                   <p className="eyebrow">Courses</p>
-                  <h3>Current semester</h3>
+                  <h3>{activeTermLabel}</h3>
                 </div>
-                <span className="progress-pill">{courseList.length} courses</span>
+                <span className="progress-pill">{enrolledCourseOptions.length} courses</span>
               </div>
               <div className="mini-list">
-                {courseList.slice(0, 4).map((course) => (
+                {enrolledCourseOptions.slice(0, 4).map((course) => (
                   <div key={`overview-${course.course}`}>
                     <strong>{course.course}</strong>
                     <span>{course.time}</span>
@@ -2499,12 +2508,12 @@ function App() {
                     setAssignmentForm({
                       ...assignmentForm,
                       courseName,
-                      textbook: getCourseTextbook(courseName, courseList)
+                      textbook: getCourseTextbook(courseName, enrolledCourseOptions)
                     });
                   }}
                 >
                   <option value="">Select enrolled course</option>
-                  {courseList.map((course) => (
+                  {enrolledCourseOptions.map((course) => (
                     <option value={course.course} key={`calendar-course-${course.id || course.course}`}>
                       {course.course}
                     </option>
@@ -2564,7 +2573,7 @@ function App() {
                   onChange={(event) => setCalendarEntryForm({ ...calendarEntryForm, courseName: event.target.value })}
                 >
                   <option value="">No course / general</option>
-                  {courseList.map((course) => (
+                  {enrolledCourseOptions.map((course) => (
                     <option value={course.course} key={`event-course-${course.id || course.course}`}>
                       {course.course}
                     </option>
@@ -2612,7 +2621,7 @@ function App() {
                     <div>
                       <strong>{assignment.title}</strong>
                       <span>{assignment.courseName} · {formatAssignmentDue(assignment)}</span>
-                      <small>{formatAssignmentReading(assignment, courseList)}</small>
+                      <small>{formatAssignmentReading(assignment, enrolledCourseOptions)}</small>
                     </div>
                     <div className="due-actions">
                       <em className={`due-chip ${assignment.priority}`}>{assignment.priority}</em>
@@ -3021,7 +3030,7 @@ function App() {
                       ? "Sync issue"
                       : "Local fallback"}
               </span>
-              <span className="progress-pill">{courseList.length} courses</span>
+              <span className="progress-pill">{enrolledCourseOptions.length} courses</span>
             </div>
           </div>
           <form className="course-form" onSubmit={addCourse}>
@@ -3091,7 +3100,7 @@ function App() {
             </button>
           </form>
           <div className="lesson-list editable-lessons">
-            {courseList.map((lesson) => (
+            {enrolledCourseOptions.map((lesson) => (
               <article className="lesson-row" key={`school-${lesson.course}`}>
                 <div className={`lesson-dot ${lesson.intensity.toLowerCase()}`} />
                 <div>
@@ -3113,7 +3122,7 @@ function App() {
               </article>
             ))}
           </div>
-          {courseList.length === 0 ? (
+          {enrolledCourseOptions.length === 0 ? (
             <div className="empty-state">
               <strong>No registered courses saved yet.</strong>
               <span>Add Eric’s current courses or import approved Navigate360/LOCUS schedule text.</span>
@@ -3364,12 +3373,12 @@ function App() {
                       setAssignmentForm({
                         ...assignmentForm,
                         courseName,
-                        textbook: getCourseTextbook(courseName, courseList)
+                        textbook: getCourseTextbook(courseName, enrolledCourseOptions)
                       });
                     }}
                   >
                     <option value="">Select enrolled course</option>
-                    {courseList.map((course) => (
+                    {enrolledCourseOptions.map((course) => (
                       <option value={course.course} key={`advisor-course-${course.id || course.course}`}>
                         {course.course}
                       </option>
@@ -3499,7 +3508,7 @@ function App() {
                 <AdvisorList
                   title="Saved assignments"
                   items={assignmentTasks.slice(0, 6).map((assignment) =>
-                    `${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}${formatAssignmentReading(assignment, courseList) ? ` · ${formatAssignmentReading(assignment, courseList)}` : ""}`
+                    `${assignment.courseName}: ${assignment.title}${assignment.dueAt ? ` due ${new Date(assignment.dueAt).toLocaleString()}` : ""}${formatAssignmentReading(assignment, enrolledCourseOptions) ? ` · ${formatAssignmentReading(assignment, enrolledCourseOptions)}` : ""}`
                   )}
                 />
               ) : null}
@@ -4275,6 +4284,39 @@ function formatAssignmentDueTime(assignment: AssignmentTask) {
 
 function getCourseTextbook(courseName: string, courses: Lesson[]) {
   return courses.find((course) => course.course === courseName)?.textbook || "";
+}
+
+function getSemesterCourseOptions(courses: Lesson[], plan: AcademicPlanTerm[]): Lesson[] {
+  return courses.length ? courses : getNextPlannedTermCourses(plan);
+}
+
+function getActiveTermLabel(courses: Lesson[], plan: AcademicPlanTerm[]) {
+  const options = getSemesterCourseOptions(courses, plan);
+  return options[0]?.term ? `${options[0].term} courses` : "Current semester";
+}
+
+function getNextPlannedTermCourses(plan: AcademicPlanTerm[]): Lesson[] {
+  const now = new Date();
+  const sortedTerms = [...plan].sort((a, b) => new Date(a.starts).getTime() - new Date(b.starts).getTime());
+  const activeOrNextTerm = sortedTerms.find((term) => {
+    const startsAt = new Date(term.starts);
+    const endsAt = new Date(startsAt);
+    endsAt.setDate(startsAt.getDate() + 120);
+    return now <= endsAt;
+  }) || sortedTerms[sortedTerms.length - 1];
+
+  if (!activeOrNextTerm) return initialCourses;
+
+  return activeOrNextTerm.courses.map((course, index) => ({
+    course: course.replace(" - ", ": "),
+    time: activeOrNextTerm.starts ? `Starts ${activeOrNextTerm.starts}` : "Time TBD",
+    task: `${activeOrNextTerm.term} · planned from Navigate360`,
+    intensity: index < 2 ? "High" : "Medium",
+    professor: "",
+    location: "",
+    textbook: "",
+    term: activeOrNextTerm.term
+  } satisfies Lesson));
 }
 
 function formatAssignmentReading(assignment: AssignmentTask, courses: Lesson[]) {
